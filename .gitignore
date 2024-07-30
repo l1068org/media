@@ -89,3 +89,9 @@ libraries/decoder_iamf/src/main/jni/libiamf
 
 # MPEG-H decoder extension
 libraries/decoder_mpegh/src/main/jni/libmpegh
+
+# Peter
+libraries/decoder_ffmpeg/.cxx/
+libraries/decoder_ffmpeg/src/main/ffmpeg
+libraries/decoder_ffmpeg/src/main/jni/ffmpeg
+libraries/decoder_ffmpeg/src/main/main

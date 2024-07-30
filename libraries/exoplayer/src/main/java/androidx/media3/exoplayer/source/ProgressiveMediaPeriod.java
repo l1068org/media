@@ -68,6 +68,7 @@ import androidx.media3.extractor.TrackOutput;
 import androidx.media3.extractor.metadata.icy.IcyHeaders;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -158,6 +159,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private int extractedSamplesCountAtStartOfLoad;
   private boolean loadingFinished;
   private boolean released;
+
+  // Peter
+  private boolean possibleEmptyTrack;
 
   /**
    * @param uri The {@link Uri} of the media stream.
@@ -838,11 +842,46 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     if (released || prepared || !sampleQueuesBuilt || seekMap == null) {
       return;
     }
-    for (SampleQueue sampleQueue : sampleQueues) {
-      if (sampleQueue.getUpstreamFormat() == null) {
-        return;
+
+    // Peter
+//    for (MySampleQueue sampleQueue : sampleQueues) {
+//      if (sampleQueue.getUpstreamFormat() == null) {
+//        return;
+//      }
+//    }
+
+    // Peter
+    // If all streams have an upstream format we can finish preparing.
+    // If there is a video and an audio stream with upstream format
+    // and there is one single stream without upstream format, it is possibly
+    // an audio stream with no data. Remove the garbage track
+    // so that playback can continue.
+
+    int nullStream = -1;
+    int nullStreamCount = 0;
+    boolean videoFound = false;
+    boolean audioFound = false;
+    for (int i = 0; i < sampleQueues.length; i++) {
+      Format upstreamFormat = sampleQueues[i].getUpstreamFormat();
+      if (upstreamFormat == null) {
+        nullStream = i;
+        ++nullStreamCount;
       }
+      else if (MimeTypes.isVideo(upstreamFormat.sampleMimeType))
+        videoFound = true;
+      else if (MimeTypes.isAudio(upstreamFormat.sampleMimeType))
+        audioFound = true;
     }
+    if (nullStreamCount == 1 && videoFound && audioFound && possibleEmptyTrack) {
+      // Remove the garbage track
+      ArrayList<SampleQueue> list = new ArrayList<>(Arrays.asList(sampleQueues));
+      list.remove(nullStream).release();
+      sampleQueues = list.toArray(new SampleQueue[0]);
+      nullStreamCount = 0;
+    }
+    if (nullStreamCount > 0)
+      return;
+
     loadCondition.close();
     int trackCount = sampleQueues.length;
     TrackGroup[] trackArray = new TrackGroup[trackCount];
@@ -1023,6 +1062,16 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     Assertions.checkState(prepared);
     checkNotNull(trackState);
     checkNotNull(seekMap);
+  }
+
+  // Peter
+  /* package */ SampleQueue[] getSampleQueues() {
+    return sampleQueues;
+  }
+
+  // Peter
+  public void setPossibleEmptyTrack(boolean possibleEmptyTrack) {
+    this.possibleEmptyTrack = possibleEmptyTrack;
   }
 
   private final class SampleStreamImpl implements SampleStream {

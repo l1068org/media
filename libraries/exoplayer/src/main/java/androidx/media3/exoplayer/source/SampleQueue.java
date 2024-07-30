@@ -1108,6 +1108,11 @@ public class SampleQueue implements TrackOutput {
     return relativeIndex < capacity ? relativeIndex : relativeIndex - capacity;
   }
 
+  // Peter
+  public long[] getTimesUs() {
+    return timesUs;
+  }
+
   /** A holder for sample metadata not held by {@link DecoderInputBuffer}. */
   /* package */ static final class SampleExtrasHolder {
 
