@@ -478,7 +478,12 @@ public abstract class Mp4Box {
 
   @SuppressWarnings({"ConstantCaseForConstants", "IdentifierName"})
   public static final int TYPE_pcmC = 0x70636d43;
-  public static final int TYPE_ap4x = 0x61703468;
+
+  @SuppressWarnings("ConstantCaseForConstants")
+  public static final int TYPE_ap4x = 0x61703478;
+
+  @SuppressWarnings("ConstantCaseForConstants")
+  public static final int TYPE_ap4h = 0x61703468;
 
   @SuppressWarnings("ConstantCaseForConstants")
   public static final int TYPE_apch = 0x61706368;
