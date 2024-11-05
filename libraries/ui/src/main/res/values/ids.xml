@@ -31,6 +31,7 @@
   <item name="exo_rew_with_amount" type="id"/>
   <item name="exo_ffwd" type="id"/>
   <item name="exo_ffwd_with_amount" type="id"/>
+  <item name="exo_skip_intro_with_amount" type="id"/>
   <item name="exo_prev" type="id"/>
   <item name="exo_next" type="id"/>
   <item name="exo_shuffle" type="id"/>

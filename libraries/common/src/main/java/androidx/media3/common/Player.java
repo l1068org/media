@@ -542,7 +542,8 @@ public interface Player {
         COMMAND_GET_TEXT,
         COMMAND_SET_TRACK_SELECTION_PARAMETERS,
         COMMAND_GET_TRACKS,
-        COMMAND_RELEASE
+        COMMAND_RELEASE,
+        COMMAND_SKIP_INTRO,
       };
 
       private final FlagSet.Builder flagsBuilder;
@@ -1061,6 +1062,16 @@ public interface Player {
     default void onSeekForwardIncrementChanged(long seekForwardIncrementMs) {}
 
     /**
+     * Called when the value of {@link #getSkipIntroIncrement()} changes.
+     *
+     * <p>{@link #onEvents(Player, Events)} will also be called to report this event along with
+     * other events that happen in the same {@link Looper} message queue iteration.
+     *
+     * @param skipIntroIncrementMs The {@link #skipIntro()} increment, in milliseconds.
+     */
+    default void onSkipIntroIncrementChanged(long skipIntroIncrementMs) {}
+
+    /**
      * Called when the value of {@link #getMaxSeekToPreviousPosition()} changes.
      *
      * <p>{@link #onEvents(Player, Events)} will also be called to report this event along with
@@ -1513,7 +1524,8 @@ public interface Player {
     EVENT_CUES,
     EVENT_METADATA,
     EVENT_DEVICE_INFO_CHANGED,
-    EVENT_DEVICE_VOLUME_CHANGED
+    EVENT_DEVICE_VOLUME_CHANGED,
+    EVENT_SKIP_INTRO_INCREMENT_CHANGED,
   })
   @interface Event {}
 
@@ -1616,6 +1628,9 @@ public interface Player {
   /** {@link #getDeviceVolume()} changed. */
   int EVENT_DEVICE_VOLUME_CHANGED = 30;
 
+  /** {@link #getSkipIntroIncrement()} changed. */
+  int EVENT_SKIP_INTRO_INCREMENT_CHANGED = 31;
+
   /**
    * Commands that indicate which method calls are currently permitted on a particular {@code
    * Player} instance.
@@ -1641,6 +1656,7 @@ public interface Player {
    *   <li>{@link #COMMAND_SEEK_TO_MEDIA_ITEM}
    *   <li>{@link #COMMAND_SEEK_BACK}
    *   <li>{@link #COMMAND_SEEK_FORWARD}
+   *   <li>{@link #COMMAND_SKIP_INTRO}
    *   <li>{@link #COMMAND_SET_SPEED_AND_PITCH}
    *   <li>{@link #COMMAND_SET_SHUFFLE_MODE}
    *   <li>{@link #COMMAND_SET_REPEAT_MODE}
@@ -1711,6 +1727,7 @@ public interface Player {
     COMMAND_SET_TRACK_SELECTION_PARAMETERS,
     COMMAND_GET_TRACKS,
     COMMAND_RELEASE,
+    COMMAND_SKIP_INTRO,
   })
   @interface Command {}
 
@@ -2115,6 +2132,14 @@ public interface Player {
    * #isCommandAvailable(int) available}.
    */
   int COMMAND_RELEASE = 32;
+
+  /**
+   * Command to skip intro of the current {@link MediaItem}.
+   *
+   * <p>The {@link #skipIntro()} method must only be called if this command is {@linkplain
+   * #isCommandAvailable(int) available}.
+   */
+  int COMMAND_SKIP_INTRO = 36;
 
   /** Represents an invalid {@link Command}. */
   int COMMAND_INVALID = -1;
@@ -2627,6 +2652,14 @@ public interface Player {
   long getSeekForwardIncrement();
 
   /**
+   * Returns the {@link #skipIntro()} increment.
+   *
+   * @return The skip intro increment, in milliseconds.
+   * @see Listener#onSkipIntroIncrementChanged(long)
+   */
+  long getSkipIntroIncrement();
+
+  /**
    * Seeks forward in the current {@link MediaItem} by {@link #getSeekForwardIncrement()}
    * milliseconds.
    *
@@ -2634,6 +2667,15 @@ public interface Player {
    * #getAvailableCommands() available}.
    */
   void seekForward();
+
+  /**
+   * Skips intro in the current {@link MediaItem} by {@link #getSkipIntroIncrement()}
+   * milliseconds.
+   *
+   * <p>This method must only be called if {@link #COMMAND_SKIP_INTRO} is {@linkplain
+   * #getAvailableCommands() available}.
+   */
+  void skipIntro();
 
   /**
    * @deprecated Use {@link #hasPreviousMediaItem()} instead.

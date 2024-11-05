@@ -638,7 +638,8 @@ import java.util.List;
         || id == R.id.exo_rew
         || id == R.id.exo_rew_with_amount
         || id == R.id.exo_ffwd
-        || id == R.id.exo_ffwd_with_amount);
+        || id == R.id.exo_ffwd_with_amount
+        || id == R.id.exo_skip_intro_with_amount);
   }
 
   private void onLayoutWidthChanged() {

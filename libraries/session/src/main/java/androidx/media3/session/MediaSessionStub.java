@@ -21,6 +21,7 @@ import static androidx.media3.common.Player.COMMAND_PLAY_PAUSE;
 import static androidx.media3.common.Player.COMMAND_PREPARE;
 import static androidx.media3.common.Player.COMMAND_SEEK_BACK;
 import static androidx.media3.common.Player.COMMAND_SEEK_FORWARD;
+import static androidx.media3.common.Player.COMMAND_SKIP_INTRO;
 import static androidx.media3.common.Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_DEFAULT_POSITION;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_MEDIA_ITEM;
@@ -847,12 +848,32 @@ import java.util.concurrent.ExecutionException;
     }
   }
 
+  @Override
+  public void skipIntro(IMediaController caller, int sequenceNumber) {
+    if (caller == null) {
+      return;
+    }
+    @Nullable
+    ControllerInfo controllerInfo = connectedControllersManager.getController(caller.asBinder());
+    if (controllerInfo != null) {
+      skipIntoForControllerInfo(controllerInfo, sequenceNumber);
+    }
+  }
+
   public void seekForwardForControllerInfo(ControllerInfo controllerInfo, int sequenceNumber) {
     queueSessionTaskWithPlayerCommandForControllerInfo(
         controllerInfo,
         sequenceNumber,
         COMMAND_SEEK_FORWARD,
         sendSessionResultSuccess(Player::seekForward));
+  }
+
+  public void skipIntoForControllerInfo(ControllerInfo controllerInfo, int sequenceNumber) {
+    queueSessionTaskWithPlayerCommandForControllerInfo(
+        controllerInfo,
+        sequenceNumber,
+        COMMAND_SKIP_INTRO,
+        sendSessionResultSuccess(Player::skipIntro));
   }
 
   @Override

@@ -144,6 +144,8 @@
 
     <include layout="@layout/exo_player_control_ffwd_button" />
 
+    <include layout="@layout/exo_player_control_skip_intro_button" />
+
     <ImageButton android:id="@id/exo_next"
         style="@style/ExoStyledControls.Button.Center.Next"/>
 

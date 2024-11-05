@@ -321,10 +321,22 @@ public class ForwardingPlayer implements Player {
     return player.getSeekForwardIncrement();
   }
 
+  /** Calls {@link Player#getSkipIntroIncrement()} on the delegate and returns the result. */
+  @Override
+  public long getSkipIntroIncrement() {
+    return player.getSkipIntroIncrement();
+  }
+
   /** Calls {@link Player#seekForward()} on the delegate. */
   @Override
   public void seekForward() {
     player.seekForward();
+  }
+
+  /** Calls {@link Player#skipIntro()} on the delegate. */
+  @Override
+  public void skipIntro() {
+    player.skipIntro();
   }
 
   /**
@@ -1068,6 +1080,11 @@ public class ForwardingPlayer implements Player {
     @Override
     public void onSeekForwardIncrementChanged(long seekForwardIncrementMs) {
       listener.onSeekForwardIncrementChanged(seekForwardIncrementMs);
+    }
+
+    @Override
+    public void onSkipIntroIncrementChanged(long skipIntroIncrementMs) {
+      listener.onSkipIntroIncrementChanged(skipIntroIncrementMs);
     }
 
     @Override

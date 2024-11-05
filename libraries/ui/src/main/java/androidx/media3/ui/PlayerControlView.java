@@ -21,6 +21,7 @@ import static androidx.media3.common.Player.COMMAND_GET_TRACKS;
 import static androidx.media3.common.Player.COMMAND_PLAY_PAUSE;
 import static androidx.media3.common.Player.COMMAND_SEEK_BACK;
 import static androidx.media3.common.Player.COMMAND_SEEK_FORWARD;
+import static androidx.media3.common.Player.COMMAND_SKIP_INTRO;
 import static androidx.media3.common.Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_MEDIA_ITEM;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_NEXT;
@@ -38,6 +39,7 @@ import static androidx.media3.common.Player.EVENT_POSITION_DISCONTINUITY;
 import static androidx.media3.common.Player.EVENT_REPEAT_MODE_CHANGED;
 import static androidx.media3.common.Player.EVENT_SEEK_BACK_INCREMENT_CHANGED;
 import static androidx.media3.common.Player.EVENT_SEEK_FORWARD_INCREMENT_CHANGED;
+import static androidx.media3.common.Player.EVENT_SKIP_INTRO_INCREMENT_CHANGED;
 import static androidx.media3.common.Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED;
 import static androidx.media3.common.Player.EVENT_TIMELINE_CHANGED;
 import static androidx.media3.common.Player.EVENT_TRACKS_CHANGED;
@@ -120,6 +122,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *   <li><b>{@code show_fastforward_button}</b> - Whether the fast forward button is shown.
  *       <ul>
  *         <li>Corresponding method: {@link #setShowFastForwardButton(boolean)}
+ *         <li>Default: true
+ *       </ul>
+ *   <li><b>{@code show_skipIntro_button}</b> - Whether the skip intro button is shown.
+ *       <ul>
+ *         <li>Corresponding method: {@link #setShowSkipIntroButton(boolean)}
  *         <li>Default: true
  *       </ul>
  *   <li><b>{@code show_previous_button}</b> - Whether the previous button is shown.
@@ -383,7 +390,9 @@ public class PlayerControlView extends FrameLayout {
   @Nullable private final ImageView playPauseButton;
   @Nullable private final View fastForwardButton;
   @Nullable private final View rewindButton;
+  @Nullable private final View skipIntroButton;
   @Nullable private final TextView fastForwardButtonTextView;
+  @Nullable private final TextView skipIntroButtonTextView;
   @Nullable private final TextView rewindButtonTextView;
   @Nullable private final ImageView repeatToggleButton;
   @Nullable private final ImageView shuffleButton;
@@ -501,6 +510,7 @@ public class PlayerControlView extends FrameLayout {
     timeBarMinUpdateIntervalMs = DEFAULT_TIME_BAR_MIN_UPDATE_INTERVAL_MS;
     boolean showRewindButton = true;
     boolean showFastForwardButton = true;
+    boolean showSkipIntroButton = true;
     boolean showPreviousButton = true;
     boolean showNextButton = true;
     boolean showShuffleButton = false;
@@ -561,6 +571,9 @@ public class PlayerControlView extends FrameLayout {
         showFastForwardButton =
             a.getBoolean(
                 R.styleable.PlayerControlView_show_fastforward_button, showFastForwardButton);
+        showSkipIntroButton =
+            a.getBoolean(
+                R.styleable.PlayerControlView_show_fastforward_button, showSkipIntroButton);
         showPreviousButton =
             a.getBoolean(R.styleable.PlayerControlView_show_previous_button, showPreviousButton);
         showNextButton =
@@ -701,6 +714,15 @@ public class PlayerControlView extends FrameLayout {
     if (fastForwardButton != null) {
       fastForwardButton.setOnClickListener(componentListener);
     }
+    View skipIntroButtonView = findViewById(R.id.exo_skip_intro_with_amount);
+    skipIntroButtonTextView = (TextView)skipIntroButtonView;
+    skipIntroButton = skipIntroButtonView;
+    if(skipIntroButtonTextView != null){
+      skipIntroButtonTextView.setTypeface(typeface);
+    }
+    if (skipIntroButton != null) {
+      skipIntroButton.setOnClickListener(componentListener);
+    }
     repeatToggleButton = findViewById(R.id.exo_repeat_toggle);
     if (repeatToggleButton != null) {
       repeatToggleButton.setOnClickListener(componentListener);
@@ -792,6 +814,7 @@ public class PlayerControlView extends FrameLayout {
     ViewGroup bottomBar = findViewById(R.id.exo_bottom_bar);
     controlViewLayoutManager.setShowButton(bottomBar, true);
     controlViewLayoutManager.setShowButton(fastForwardButton, showFastForwardButton);
+    controlViewLayoutManager.setShowButton(skipIntroButton, showSkipIntroButton);
     controlViewLayoutManager.setShowButton(rewindButton, showRewindButton);
     controlViewLayoutManager.setShowButton(previousButton, showPreviousButton);
     controlViewLayoutManager.setShowButton(nextButton, showNextButton);
@@ -935,6 +958,16 @@ public class PlayerControlView extends FrameLayout {
    */
   public void setShowFastForwardButton(boolean showFastForwardButton) {
     controlViewLayoutManager.setShowButton(fastForwardButton, showFastForwardButton);
+    updateNavigation();
+  }
+
+  /**
+   * Sets whether the skip intro button is shown.
+   *
+   * @param showSkipIntroButton Whether the fast forward button is shown.
+   */
+  public void setShowSkipIntroButton(boolean showSkipIntroButton) {
+    controlViewLayoutManager.setShowButton(skipIntroButton, showSkipIntroButton);
     updateNavigation();
   }
 
@@ -1192,6 +1225,7 @@ public class PlayerControlView extends FrameLayout {
     boolean enablePrevious = false;
     boolean enableRewind = false;
     boolean enableFastForward = false;
+    boolean enableSkipIntro = false;
     boolean enableNext = false;
     if (player != null) {
       enableSeeking =
@@ -1201,6 +1235,7 @@ public class PlayerControlView extends FrameLayout {
       enablePrevious = player.isCommandAvailable(COMMAND_SEEK_TO_PREVIOUS);
       enableRewind = player.isCommandAvailable(COMMAND_SEEK_BACK);
       enableFastForward = player.isCommandAvailable(COMMAND_SEEK_FORWARD);
+      enableSkipIntro = player.isCommandAvailable(COMMAND_SKIP_INTRO);
       enableNext = player.isCommandAvailable(COMMAND_SEEK_TO_NEXT);
     }
 
@@ -1210,10 +1245,14 @@ public class PlayerControlView extends FrameLayout {
     if (enableFastForward) {
       updateFastForwardButton();
     }
+    if (enableSkipIntro) {
+      updateSkipIntroButton();
+    }
 
     updateButton(enablePrevious, previousButton);
     updateButton(enableRewind, rewindButton);
     updateButton(enableFastForward, fastForwardButton);
+    updateButton(enableSkipIntro, skipIntroButton);
     updateButton(enableNext, nextButton);
     if (timeBar != null) {
       timeBar.setEnabled(enableSeeking);
@@ -1243,6 +1282,22 @@ public class PlayerControlView extends FrameLayout {
     }
     if (fastForwardButton != null) {
       fastForwardButton.setContentDescription(
+          resources.getQuantityString(
+              R.plurals.exo_controls_fastforward_by_amount_description,
+              fastForwardSec,
+              fastForwardSec));
+    }
+  }
+
+  private void updateSkipIntroButton() {
+    long fastForwardMs =
+        player != null ? player.getSkipIntroIncrement() : C.DEFAULT_SKIP_INTRO_INCREMENT_MS;
+    int fastForwardSec = (int) (fastForwardMs / 1_000);
+    if(skipIntroButtonTextView != null) {
+      skipIntroButtonTextView.setText(String.valueOf(fastForwardSec));
+    }
+    if (skipIntroButton != null) {
+      skipIntroButton.setContentDescription(
           resources.getQuantityString(
               R.plurals.exo_controls_fastforward_by_amount_description,
               fastForwardSec,
@@ -1820,6 +1875,7 @@ public class PlayerControlView extends FrameLayout {
           EVENT_TIMELINE_CHANGED,
           EVENT_SEEK_BACK_INCREMENT_CHANGED,
           EVENT_SEEK_FORWARD_INCREMENT_CHANGED,
+          EVENT_SKIP_INTRO_INCREMENT_CHANGED,
           EVENT_AVAILABLE_COMMANDS_CHANGED)) {
         updateNavigation();
       }
@@ -1886,6 +1942,11 @@ public class PlayerControlView extends FrameLayout {
         if (player.getPlaybackState() != Player.STATE_ENDED
             && player.isCommandAvailable(COMMAND_SEEK_FORWARD)) {
           player.seekForward();
+        }
+      } else if (skipIntroButton == view) {
+        if (player.getPlaybackState() != Player.STATE_ENDED
+            && player.isCommandAvailable(COMMAND_SKIP_INTRO)) {
+          player.skipIntro();
         }
       } else if (rewindButton == view) {
         if (player.isCommandAvailable(COMMAND_SEEK_BACK)) {

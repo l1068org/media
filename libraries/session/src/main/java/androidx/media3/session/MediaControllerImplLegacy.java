@@ -404,9 +404,19 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
   }
 
   @Override
+  public long getSkipIntroIncrement() {
+    return controllerInfo.playerInfo.skipIntroIncrementMs;
+  }
+
+  @Override
   public void seekForward() {
     // To be consistent with handling KEYCODE_MEDIA_FAST_FORWARD in MediaSessionCompat
     controllerCompat.getTransportControls().fastForward();
+  }
+
+  @Override
+  public void skipIntro() {
+    return;
   }
 
   @Override
@@ -2134,6 +2144,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
         LegacyConversions.convertToIsDeviceMuted(newLegacyPlayerInfo.playbackInfoCompat);
     long seekBackIncrementMs = oldControllerInfo.playerInfo.seekBackIncrementMs;
     long seekForwardIncrementMs = oldControllerInfo.playerInfo.seekForwardIncrementMs;
+    long skipIntroIncrementMs = oldControllerInfo.playerInfo.skipIntroIncrementMs;
     long maxSeekToPreviousPositionMs = oldControllerInfo.playerInfo.maxSeekToPreviousPositionMs;
 
     return createControllerInfo(
@@ -2165,6 +2176,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
         deviceMuted,
         seekBackIncrementMs,
         seekForwardIncrementMs,
+        skipIntroIncrementMs,
         maxSeekToPreviousPositionMs);
   }
 
@@ -2335,6 +2347,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
       boolean deviceMuted,
       long seekBackIncrementMs,
       long seekForwardIncrementMs,
+      long skipIntroIncrementMs,
       long maxSeekToPreviousPositionMs) {
 
     @Nullable MediaItem currentMediaItem = currentTimeline.getMediaItemAt(currentMediaItemIndex);
@@ -2384,6 +2397,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
             /* mediaMetadata= */ mediaMetadata,
             seekBackIncrementMs,
             seekForwardIncrementMs,
+            skipIntroIncrementMs,
             maxSeekToPreviousPositionMs,
             /* currentTracks= */ Tracks.EMPTY,
             /* parameters= */ TrackSelectionParameters.DEFAULT_WITHOUT_CONTEXT);

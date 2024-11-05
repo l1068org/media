@@ -336,6 +336,16 @@ public class SimpleExoPlayer extends BasePlayer
     }
 
     /**
+     * @deprecated Use {@link ExoPlayer.Builder#setSipkIntroIncrementMs(long)} instead.
+     */
+    @CanIgnoreReturnValue
+    @Deprecated
+    public Builder setSkipIntroIncrementMs(@IntRange(from = 1) long skipIntroIncrementMs) {
+      wrappedBuilder.setSkipIntroIncrementMs(skipIntroIncrementMs);
+      return this;
+    }
+
+    /**
      * @deprecated Use {@link ExoPlayer.Builder#setReleaseTimeoutMs(long)} instead.
      */
     @CanIgnoreReturnValue
@@ -1044,6 +1054,12 @@ public class SimpleExoPlayer extends BasePlayer
   public long getSeekForwardIncrement() {
     blockUntilConstructorFinished();
     return player.getSeekForwardIncrement();
+  }
+
+  @Override
+  public long getSkipIntroIncrement() {
+    blockUntilConstructorFinished();
+    return player.getSkipIntroIncrement();
   }
 
   @Override

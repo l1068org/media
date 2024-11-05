@@ -150,6 +150,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
     private MediaMetadata mediaMetadata;
     private long seekBackIncrementMs;
     private long seekForwardIncrementMs;
+    private long skipIntroIncrementMs;
     private long maxSeekToPreviousPositionMs;
     private Tracks currentTracks;
     private TrackSelectionParameters trackSelectionParameters;
@@ -183,6 +184,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
       mediaMetadata = playerInfo.mediaMetadata;
       seekBackIncrementMs = playerInfo.seekBackIncrementMs;
       seekForwardIncrementMs = playerInfo.seekForwardIncrementMs;
+      skipIntroIncrementMs = playerInfo.skipIntroIncrementMs;
       maxSeekToPreviousPositionMs = playerInfo.maxSeekToPreviousPositionMs;
       currentTracks = playerInfo.currentTracks;
       trackSelectionParameters = playerInfo.trackSelectionParameters;
@@ -360,6 +362,12 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
     }
 
     @CanIgnoreReturnValue
+    public Builder setSkipIntroIncrement(long skipIntroIncrementMs) {
+      this.skipIntroIncrementMs = skipIntroIncrementMs;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
     public Builder setMaxSeekToPreviousPositionMs(long maxSeekToPreviousPositionMs) {
       this.maxSeekToPreviousPositionMs = maxSeekToPreviousPositionMs;
       return this;
@@ -410,6 +418,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
           mediaMetadata,
           seekBackIncrementMs,
           seekForwardIncrementMs,
+          skipIntroIncrementMs,
           maxSeekToPreviousPositionMs,
           currentTracks,
           trackSelectionParameters);
@@ -460,6 +469,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
           MediaMetadata.EMPTY,
           /* seekBackIncrementMs= */ C.DEFAULT_SEEK_BACK_INCREMENT_MS,
           /* seekForwardIncrementMs= */ C.DEFAULT_SEEK_FORWARD_INCREMENT_MS,
+          /* skipIntroIncrementMs= */ 0,
           /* maxSeekToPreviousPositionMs= */ C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS,
           /* currentTracks= */ Tracks.EMPTY,
           TrackSelectionParameters.DEFAULT_WITHOUT_CONTEXT);
@@ -519,6 +529,8 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
   public final long seekBackIncrementMs;
 
   public final long seekForwardIncrementMs;
+
+  public final long skipIntroIncrementMs;
 
   public final long maxSeekToPreviousPositionMs;
 
@@ -697,6 +709,11 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
   }
 
   @CheckResult
+  public PlayerInfo copyWithSkipIntroIncrement(long skipIntroIncrementMs) {
+    return new Builder(this).setSkipIntroIncrement(skipIntroIncrementMs).build();
+  }
+
+  @CheckResult
   public PlayerInfo copyWithMaxSeekToPreviousPositionMs(long maxSeekToPreviousPositionMs) {
     return new Builder(this).setMaxSeekToPreviousPositionMs(maxSeekToPreviousPositionMs).build();
   }
@@ -739,6 +756,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
       MediaMetadata mediaMetadata,
       long seekBackIncrementMs,
       long seekForwardIncrementMs,
+      long skipIntroIncrementMs,
       long maxSeekToPreviousPositionMs,
       Tracks currentTracks,
       TrackSelectionParameters parameters) {
@@ -770,6 +788,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
     this.mediaMetadata = mediaMetadata;
     this.seekBackIncrementMs = seekBackIncrementMs;
     this.seekForwardIncrementMs = seekForwardIncrementMs;
+    this.skipIntroIncrementMs = skipIntroIncrementMs;
     this.maxSeekToPreviousPositionMs = maxSeekToPreviousPositionMs;
     this.currentTracks = currentTracks;
     this.trackSelectionParameters = parameters;
@@ -831,6 +850,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
   private static final String FIELD_CURRENT_TRACKS = Util.intToStringMaxRadix(30);
   private static final String FIELD_TIMELINE_CHANGE_REASON = Util.intToStringMaxRadix(31);
   private static final String FIELD_IN_PROCESS_BINDER = Util.intToStringMaxRadix(32);
+  private static final String FIELD_SKIP_INTRO_INCREMENT_MS = Util.intToStringMaxRadix(33);
 
   // Next field key = 33
 
@@ -995,6 +1015,9 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
     if (seekForwardIncrementMs != defaultSeekForwardIncrementMs) {
       bundle.putLong(FIELD_SEEK_FORWARD_INCREMENT_MS, seekForwardIncrementMs);
     }
+    if (skipIntroIncrementMs != 0) {
+      bundle.putLong(FIELD_SKIP_INTRO_INCREMENT_MS, skipIntroIncrementMs);
+    }
     long defaultMaxSeekToPreviousPositionMs =
         controllerInterfaceVersion < 6 ? 0 : C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS;
     if (maxSeekToPreviousPositionMs != defaultMaxSeekToPreviousPositionMs) {
@@ -1104,6 +1127,8 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
             /* defaultValue= */ sessionInterfaceVersion < 4
                 ? 0
                 : C.DEFAULT_SEEK_FORWARD_INCREMENT_MS);
+    long skipIntroIncrementMs =
+        bundle.getLong(FIELD_SKIP_INTRO_INCREMENT_MS, /* defaultValue= */ 0);
     long maxSeekToPreviousPosition =
         bundle.getLong(
             FIELD_MAX_SEEK_TO_PREVIOUS_POSITION_MS,
@@ -1148,6 +1173,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
         mediaMetadata,
         seekBackIncrementMs,
         seekForwardIncrementMs,
+        skipIntroIncrementMs,
         maxSeekToPreviousPosition,
         currentTracks,
         trackSelectionParameters);

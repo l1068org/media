@@ -20,6 +20,7 @@ import static androidx.media3.common.Player.COMMAND_PLAY_PAUSE;
 import static androidx.media3.common.Player.COMMAND_PREPARE;
 import static androidx.media3.common.Player.COMMAND_SEEK_BACK;
 import static androidx.media3.common.Player.COMMAND_SEEK_FORWARD;
+import static androidx.media3.common.Player.COMMAND_SKIP_INTRO;
 import static androidx.media3.common.Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_DEFAULT_POSITION;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_MEDIA_ITEM;
@@ -3469,6 +3470,7 @@ public final class Util {
         .addIf(COMMAND_SEEK_TO_MEDIA_ITEM, !isPlayingAd)
         .addIf(COMMAND_SEEK_BACK, isCurrentMediaItemSeekable && !isPlayingAd)
         .addIf(COMMAND_SEEK_FORWARD, isCurrentMediaItemSeekable && !isPlayingAd)
+        .addIf(COMMAND_SKIP_INTRO, isCurrentMediaItemSeekable && !isPlayingAd)
         .build();
   }
 

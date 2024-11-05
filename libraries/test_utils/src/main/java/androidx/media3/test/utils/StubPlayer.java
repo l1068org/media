@@ -172,6 +172,11 @@ public class StubPlayer extends BasePlayer {
   }
 
   @Override
+  public long getSkipIntroIncrement() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public long getMaxSeekToPreviousPosition() {
     throw new UnsupportedOperationException();
   }

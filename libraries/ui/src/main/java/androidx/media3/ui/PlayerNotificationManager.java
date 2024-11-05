@@ -20,6 +20,7 @@ import static androidx.media3.common.Player.COMMAND_GET_CURRENT_MEDIA_ITEM;
 import static androidx.media3.common.Player.COMMAND_GET_TIMELINE;
 import static androidx.media3.common.Player.COMMAND_SEEK_BACK;
 import static androidx.media3.common.Player.COMMAND_SEEK_FORWARD;
+import static androidx.media3.common.Player.COMMAND_SKIP_INTRO;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_NEXT;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_PREVIOUS;
 import static androidx.media3.common.Player.COMMAND_STOP;
@@ -117,6 +118,18 @@ import java.util.Map;
  *       the lock screen notification). Else does nothing.
  *       <ul>
  *         <li>Corresponding setter: {@link #setUseFastForwardActionInCompactView(boolean)}
+ *         <li>Default: {@code false}
+ *       </ul>
+ *   <li><b>{@code useSkipIntroAction}</b> - Sets whether the skip intro action is used.
+ *       <ul>
+ *         <li>Corresponding setter: {@link #setUseSkipIntroAction(boolean)}
+ *         <li>Default: {@code true}
+ *       </ul>
+ *   <li><b>{@code useSkipIntroActionInCompactView}</b> - If {@code useSkipIntroAction} is
+ *       {@code true}, sets whether the skip intro action is also used in compact view (including
+ *       the lock screen notification). Else does nothing.
+ *       <ul>
+ *         <li>Corresponding setter: {@link #setUseSkipIntroActionInCompactView(boolean)}
  *         <li>Default: {@code false}
  *       </ul>
  *   <li><b>{@code usePreviousAction}</b> - Whether the previous action is used.
@@ -335,6 +348,7 @@ public class PlayerNotificationManager {
     protected int pauseActionIconResourceId;
     protected int stopActionIconResourceId;
     protected int fastForwardActionIconResourceId;
+    protected int skipIntroActionIconResourceId;
     protected int previousActionIconResourceId;
     protected int nextActionIconResourceId;
     @Nullable protected String groupKey;
@@ -375,6 +389,7 @@ public class PlayerNotificationManager {
       stopActionIconResourceId = R.drawable.exo_notification_stop;
       rewindActionIconResourceId = R.drawable.exo_notification_rewind;
       fastForwardActionIconResourceId = R.drawable.exo_notification_fastforward;
+      skipIntroActionIconResourceId = R.drawable.exo_notification_fastforward;
       previousActionIconResourceId = R.drawable.exo_notification_previous;
       nextActionIconResourceId = R.drawable.exo_notification_next;
     }
@@ -520,6 +535,19 @@ public class PlayerNotificationManager {
     }
 
     /**
+     * The resource id of the drawable to be used as the icon of action {@link
+     * #ACTION_SKIP_INTRO}.
+     *
+     * <p>The default is {@code R.drawable#exo_notification_skipintro}.
+     *
+     * @return This builder.
+     */
+    public Builder setSkipIntroActionIconResourceId(int skipIntroActionIconResourceId) {
+      this.skipIntroActionIconResourceId = skipIntroActionIconResourceId;
+      return this;
+    }
+
+    /**
      * The resource id of the drawable to be used as the icon of action {@link #ACTION_PREVIOUS}.
      *
      * <p>The default is {@code R.drawable#exo_notification_previous}.
@@ -591,6 +619,7 @@ public class PlayerNotificationManager {
           stopActionIconResourceId,
           rewindActionIconResourceId,
           fastForwardActionIconResourceId,
+          skipIntroActionIconResourceId,
           previousActionIconResourceId,
           nextActionIconResourceId,
           groupKey);
@@ -632,6 +661,9 @@ public class PlayerNotificationManager {
 
   /** The action which fast forwards. */
   public static final String ACTION_FAST_FORWARD = "androidx.media3.ui.notification.ffwd";
+
+  /** The action which skips intro. */
+  public static final String ACTION_SKIP_INTRO = "androidx.media3.ui.notification.skipintro";
 
   /** The action which rewinds. */
   public static final String ACTION_REWIND = "androidx.media3.ui.notification.rewind";
@@ -716,8 +748,10 @@ public class PlayerNotificationManager {
   private boolean useNextActionInCompactView;
   private boolean useRewindAction;
   private boolean useFastForwardAction;
+  private boolean useSkipIntroAction;
   private boolean useRewindActionInCompactView;
   private boolean useFastForwardActionInCompactView;
+  private boolean useSkipIntroActionInCompactView;
   private boolean usePlayPauseActions;
   private boolean showPlayButtonIfSuppressed;
   private boolean useStopAction;
@@ -744,6 +778,7 @@ public class PlayerNotificationManager {
       int stopActionIconResourceId,
       int rewindActionIconResourceId,
       int fastForwardActionIconResourceId,
+      int skipIntroActionIconResourceId,
       int previousActionIconResourceId,
       int nextActionIconResourceId,
       @Nullable String groupKey) {
@@ -773,6 +808,7 @@ public class PlayerNotificationManager {
     showPlayButtonIfSuppressed = true;
     useRewindAction = true;
     useFastForwardAction = true;
+    useSkipIntroAction = true;
     colorized = true;
     useChronometer = true;
     color = Color.TRANSPARENT;
@@ -791,6 +827,7 @@ public class PlayerNotificationManager {
             stopActionIconResourceId,
             rewindActionIconResourceId,
             fastForwardActionIconResourceId,
+            skipIntroActionIconResourceId,
             previousActionIconResourceId,
             nextActionIconResourceId);
     for (String action : playbackActions.keySet()) {
@@ -917,6 +954,18 @@ public class PlayerNotificationManager {
   }
 
   /**
+   * Sets whether the skip intro action should be used.
+   *
+   * @param useFastForwardAction Whether to use the skip intro action.
+   */
+  public final void setUseSkipIntroAction(boolean useSkipIntroAction) {
+    if (this.useSkipIntroAction != useSkipIntroAction) {
+      this.useSkipIntroAction = useSkipIntroAction;
+      invalidate();
+    }
+  }
+
+  /**
    * Sets whether the rewind action should be used.
    *
    * @param useRewindAction Whether to use the rewind action.
@@ -943,6 +992,27 @@ public class PlayerNotificationManager {
     if (this.useFastForwardActionInCompactView != useFastForwardActionInCompactView) {
       this.useFastForwardActionInCompactView = useFastForwardActionInCompactView;
       if (useFastForwardActionInCompactView) {
+        useNextActionInCompactView = false;
+      }
+      invalidate();
+    }
+  }
+
+  /**
+   * Sets whether the skip intro action should also be used in compact view. Has no effect if
+   * {@link #ACTION_SKIP_INTRO} is not enabled, for instance if the media is not seekable.
+   *
+   * <p>If set to {@code true}, {@link #setUseNextActionInCompactView(boolean)
+   * setUseNextActionInCompactView} is set to false.
+   *
+   * @param useSkipIntroActionInCompactView Whether to use the skip intro action in compact
+   *     view.
+   */
+  public final void setUseSkipIntroActionInCompactView(
+      boolean useSkipIntroActionInCompactView) {
+    if (this.useSkipIntroActionInCompactView != useSkipIntroActionInCompactView) {
+      this.useSkipIntroActionInCompactView = useSkipIntroActionInCompactView;
+      if (useSkipIntroActionInCompactView) {
         useNextActionInCompactView = false;
       }
       invalidate();
@@ -1376,6 +1446,7 @@ public class PlayerNotificationManager {
     boolean enablePrevious = player.isCommandAvailable(COMMAND_SEEK_TO_PREVIOUS);
     boolean enableRewind = player.isCommandAvailable(COMMAND_SEEK_BACK);
     boolean enableFastForward = player.isCommandAvailable(COMMAND_SEEK_FORWARD);
+    boolean enableSkipIntro = player.isCommandAvailable(COMMAND_SKIP_INTRO);
     boolean enableNext = player.isCommandAvailable(COMMAND_SEEK_TO_NEXT);
 
     List<String> stringActions = new ArrayList<>();
@@ -1394,6 +1465,9 @@ public class PlayerNotificationManager {
     }
     if (useFastForwardAction && enableFastForward) {
       stringActions.add(ACTION_FAST_FORWARD);
+    }
+    if (useSkipIntroAction && enableSkipIntro) {
+      stringActions.add(ACTION_SKIP_INTRO);
     }
     if (useNextAction && enableNext) {
       stringActions.add(ACTION_NEXT);
@@ -1492,6 +1566,7 @@ public class PlayerNotificationManager {
       int stopActionIconResourceId,
       int rewindActionIconResourceId,
       int fastForwardActionIconResourceId,
+      int skipIntroActionIconResourceId,
       int previousActionIconResourceId,
       int nextActionIconResourceId) {
     Map<String, NotificationCompat.Action> actions = new HashMap<>();
@@ -1525,6 +1600,12 @@ public class PlayerNotificationManager {
             fastForwardActionIconResourceId,
             context.getString(R.string.exo_controls_fastforward_description),
             createBroadcastIntent(ACTION_FAST_FORWARD, context, instanceId)));
+    actions.put(
+        ACTION_SKIP_INTRO,
+        new NotificationCompat.Action(
+            skipIntroActionIconResourceId,
+            context.getString(R.string.exo_controls_fastforward_description),
+            createBroadcastIntent(ACTION_SKIP_INTRO, context, instanceId)));
     actions.put(
         ACTION_PREVIOUS,
         new NotificationCompat.Action(
@@ -1606,6 +1687,10 @@ public class PlayerNotificationManager {
       } else if (ACTION_FAST_FORWARD.equals(action)) {
         if (player.isCommandAvailable(COMMAND_SEEK_FORWARD)) {
           player.seekForward();
+        }
+      } else if (ACTION_SKIP_INTRO.equals(action)) {
+        if (player.isCommandAvailable(COMMAND_SKIP_INTRO)) {
+          player.skipIntro();
         }
       } else if (ACTION_NEXT.equals(action)) {
         if (player.isCommandAvailable(COMMAND_SEEK_TO_NEXT)) {

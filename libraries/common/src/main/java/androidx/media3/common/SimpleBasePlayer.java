@@ -113,6 +113,7 @@ public abstract class SimpleBasePlayer extends BasePlayer {
       private boolean isLoading;
       private long seekBackIncrementMs;
       private long seekForwardIncrementMs;
+      private long skipIntroIncrementMs;
       private long maxSeekToPreviousPositionMs;
       private PlaybackParameters playbackParameters;
       private TrackSelectionParameters trackSelectionParameters;
@@ -156,6 +157,7 @@ public abstract class SimpleBasePlayer extends BasePlayer {
         isLoading = false;
         seekBackIncrementMs = C.DEFAULT_SEEK_BACK_INCREMENT_MS;
         seekForwardIncrementMs = C.DEFAULT_SEEK_FORWARD_INCREMENT_MS;
+        skipIntroIncrementMs = C.DEFAULT_SKIP_INTRO_INCREMENT_MS;
         maxSeekToPreviousPositionMs = C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS;
         playbackParameters = PlaybackParameters.DEFAULT;
         trackSelectionParameters = TrackSelectionParameters.DEFAULT_WITHOUT_CONTEXT;
@@ -363,6 +365,18 @@ public abstract class SimpleBasePlayer extends BasePlayer {
       @CanIgnoreReturnValue
       public Builder setSeekForwardIncrementMs(long seekForwardIncrementMs) {
         this.seekForwardIncrementMs = seekForwardIncrementMs;
+        return this;
+      }
+
+      /**
+       * Sets the {@link Player#skipIntro()} increment in milliseconds.
+       *
+       * @param skipIntroIncrementMs The {@link Player#skipIntro()} increment in milliseconds.
+       * @return This builder.
+       */
+      @CanIgnoreReturnValue
+      public Builder setSkipIntroIncrementMs(long skipIntroIncrementMs) {
+        this.skipIntroIncrementMs = skipIntroIncrementMs;
         return this;
       }
 
@@ -803,6 +817,9 @@ public abstract class SimpleBasePlayer extends BasePlayer {
     /** The {@link Player#seekForward()} increment in milliseconds. */
     public final long seekForwardIncrementMs;
 
+    /** The {@link Player#skipIntro()} increment in milliseconds. */
+    public final long skipIntroIncrementMs;
+
     /**
      * The maximum position for which {@link #seekToPrevious()} seeks to the previous item, in
      * milliseconds.
@@ -1002,6 +1019,7 @@ public abstract class SimpleBasePlayer extends BasePlayer {
       this.isLoading = builder.isLoading;
       this.seekBackIncrementMs = builder.seekBackIncrementMs;
       this.seekForwardIncrementMs = builder.seekForwardIncrementMs;
+      this.skipIntroIncrementMs = builder.skipIntroIncrementMs;
       this.maxSeekToPreviousPositionMs = builder.maxSeekToPreviousPositionMs;
       this.playbackParameters = builder.playbackParameters;
       this.trackSelectionParameters = builder.trackSelectionParameters;
@@ -1056,6 +1074,7 @@ public abstract class SimpleBasePlayer extends BasePlayer {
           && isLoading == state.isLoading
           && seekBackIncrementMs == state.seekBackIncrementMs
           && seekForwardIncrementMs == state.seekForwardIncrementMs
+          && skipIntroIncrementMs == state.skipIntroIncrementMs
           && maxSeekToPreviousPositionMs == state.maxSeekToPreviousPositionMs
           && playbackParameters.equals(state.playbackParameters)
           && trackSelectionParameters.equals(state.trackSelectionParameters)
@@ -1098,6 +1117,7 @@ public abstract class SimpleBasePlayer extends BasePlayer {
       result = 31 * result + (isLoading ? 1 : 0);
       result = 31 * result + (int) (seekBackIncrementMs ^ (seekBackIncrementMs >>> 32));
       result = 31 * result + (int) (seekForwardIncrementMs ^ (seekForwardIncrementMs >>> 32));
+      result = 31 * result + (int) (skipIntroIncrementMs ^ (skipIntroIncrementMs >>> 32));
       result =
           31 * result + (int) (maxSeekToPreviousPositionMs ^ (maxSeekToPreviousPositionMs >>> 32));
       result = 31 * result + playbackParameters.hashCode();
@@ -2386,6 +2406,12 @@ public abstract class SimpleBasePlayer extends BasePlayer {
   }
 
   @Override
+  public final long getSkipIntroIncrement() {
+    verifyApplicationThreadAndInitState();
+    return state.skipIntroIncrementMs;
+  }
+
+  @Override
   public final long getMaxSeekToPreviousPosition() {
     verifyApplicationThreadAndInitState();
     return state.maxSeekToPreviousPositionMs;
@@ -3543,6 +3569,11 @@ public abstract class SimpleBasePlayer extends BasePlayer {
       listeners.queueEvent(
           Player.EVENT_SEEK_FORWARD_INCREMENT_CHANGED,
           listener -> listener.onSeekForwardIncrementChanged(newState.seekForwardIncrementMs));
+    }
+    if (previousState.skipIntroIncrementMs != newState.skipIntroIncrementMs) {
+      listeners.queueEvent(
+          Player.EVENT_SKIP_INTRO_INCREMENT_CHANGED,
+          listener -> listener.onSkipIntroIncrementChanged(newState.skipIntroIncrementMs));
     }
     if (previousState.maxSeekToPreviousPositionMs != newState.maxSeekToPreviousPositionMs) {
       listeners.queueEvent(

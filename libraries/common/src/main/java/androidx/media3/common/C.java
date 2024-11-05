@@ -1028,6 +1028,9 @@ public final class C {
   /** A default seek forward increment, in milliseconds. */
   public static final long DEFAULT_SEEK_FORWARD_INCREMENT_MS = 15_000;
 
+  /** A default skip intro increment, in milliseconds. */
+  public static final long DEFAULT_SKIP_INTRO_INCREMENT_MS = 86_000;
+
   /**
    * A default maximum position for which a seek to previous will seek to the previous window, in
    * milliseconds.

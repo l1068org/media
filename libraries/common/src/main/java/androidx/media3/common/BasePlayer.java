@@ -96,7 +96,9 @@ public abstract class BasePlayer implements Player {
 
   @Override
   public final boolean isCommandAvailable(@Command int command) {
-    return getAvailableCommands().contains(command);
+    Commands commands = getAvailableCommands();
+    System.out.println("Commands: " + commands);
+    return commands.contains(command);
   }
 
   /**
@@ -145,6 +147,11 @@ public abstract class BasePlayer implements Player {
   @Override
   public final void seekForward() {
     seekToOffset(getSeekForwardIncrement(), Player.COMMAND_SEEK_FORWARD);
+  }
+
+  @Override
+  public final void skipIntro() {
+    seekToOffset(getSkipIntroIncrement(), Player.COMMAND_SKIP_INTRO);
   }
 
   /**

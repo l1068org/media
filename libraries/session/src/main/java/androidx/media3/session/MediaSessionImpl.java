@@ -1551,6 +1551,24 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
 
     @Override
+    public void onSkipIntroIncrementChanged(long skipIntroIncrementMs) {
+      MediaSessionImpl session = getSession();
+      if (session == null) {
+        return;
+      }
+      session.verifyApplicationThread();
+      PlayerWrapper player = this.player.get();
+      if (player == null) {
+        return;
+      }
+      session.playerInfo = session.playerInfo.copyWithSkipIntroIncrement(skipIntroIncrementMs);
+      session.onPlayerInfoChangedHandler.sendPlayerInfoChangedMessage(
+          /* excludeTimeline= */ true, /* excludeTracks= */ true);
+      session.dispatchRemoteControllerTaskToLegacyStub(
+          (callback, seq) -> callback.onSkipIntroIncrementChanged(seq, skipIntroIncrementMs));
+    }
+
+    @Override
     public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
       @Nullable MediaSessionImpl session = getSession();
       if (session == null) {

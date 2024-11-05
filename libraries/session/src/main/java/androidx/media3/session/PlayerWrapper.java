@@ -284,9 +284,21 @@ import java.util.List;
   }
 
   @Override
+  public long getSkipIntroIncrement() {
+    verifyApplicationThread();
+    return super.getSkipIntroIncrement();
+  }
+
+  @Override
   public void seekForward() {
     verifyApplicationThread();
     super.seekForward();
+  }
+
+  @Override
+  public void skipIntro() {
+    verifyApplicationThread();
+    super.skipIntro();
   }
 
   @Override
@@ -1280,6 +1292,7 @@ import java.util.List;
         getMediaMetadataWithCommandCheck(),
         getSeekBackIncrement(),
         getSeekForwardIncrement(),
+        getSkipIntroIncrement(),
         getMaxSeekToPreviousPosition(),
         getCurrentTracksWithCommandCheck(),
         getTrackSelectionParameters());
@@ -1301,6 +1314,8 @@ import java.util.List;
       case Player.COMMAND_SEEK_BACK:
         return PlaybackStateCompat.ACTION_REWIND;
       case Player.COMMAND_SEEK_FORWARD:
+        return PlaybackStateCompat.ACTION_FAST_FORWARD;
+      case Player.COMMAND_SKIP_INTRO:
         return PlaybackStateCompat.ACTION_FAST_FORWARD;
       case Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM:
         return PlaybackStateCompat.ACTION_SEEK_TO;

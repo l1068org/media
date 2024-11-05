@@ -95,6 +95,7 @@ public class CommonConstants {
   public static final String KEY_SHUFFLE_MODE_ENABLED = "shuffleModeEnabled";
   public static final String KEY_SEEK_BACK_INCREMENT_MS = "seekBackIncrementMs";
   public static final String KEY_SEEK_FORWARD_INCREMENT_MS = "seekForwardIncrementMs";
+  public static final String KEY_SKIP_INTRO_INCREMENT_MS = "skipIntroIncrementMs";
   public static final String KEY_IS_PLAYING_AD = "isPlayingAd";
   public static final String KEY_CURRENT_AD_GROUP_INDEX = "currentAdGroupIndex";
   public static final String KEY_CURRENT_AD_INDEX_IN_AD_GROUP = "currentAdIndexInAdGroup";

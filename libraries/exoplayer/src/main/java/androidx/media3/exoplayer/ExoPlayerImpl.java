@@ -174,6 +174,7 @@ import java.util.concurrent.TimeoutException;
   private final BandwidthMeter bandwidthMeter;
   private final long seekBackIncrementMs;
   private final long seekForwardIncrementMs;
+  private final long skipIntroIncrementMs;
   private final long maxSeekToPreviousPositionMs;
   private final Clock clock;
   private final ComponentListener componentListener;
@@ -286,6 +287,7 @@ import java.util.concurrent.TimeoutException;
       this.seekParameters = builder.seekParameters;
       this.seekBackIncrementMs = builder.seekBackIncrementMs;
       this.seekForwardIncrementMs = builder.seekForwardIncrementMs;
+      this.skipIntroIncrementMs = builder.skipIntroIncrementMs;
       this.maxSeekToPreviousPositionMs = builder.maxSeekToPreviousPositionMs;
       this.pauseAtEndOfMediaItems = builder.pauseAtEndOfMediaItems;
       this.applicationLooper = builder.looper;
@@ -959,6 +961,12 @@ import java.util.concurrent.TimeoutException;
   public long getSeekForwardIncrement() {
     verifyApplicationThread();
     return seekForwardIncrementMs;
+  }
+
+  @Override
+  public long getSkipIntroIncrement() {
+    verifyApplicationThread();
+    return skipIntroIncrementMs;
   }
 
   @Override
@@ -2344,7 +2352,7 @@ import java.util.concurrent.TimeoutException;
       listeners.queueEvent(
           Player.EVENT_AVAILABLE_COMMANDS_CHANGED,
           listener -> listener.onAvailableCommandsChanged(availableCommands));
-    }
+    }    
   }
 
   private void setMediaSourcesInternal(

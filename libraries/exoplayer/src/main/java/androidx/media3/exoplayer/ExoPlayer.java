@@ -495,6 +495,7 @@ public interface ExoPlayer extends Player {
     /* package */ SeekParameters seekParameters;
     /* package */ long seekBackIncrementMs;
     /* package */ long seekForwardIncrementMs;
+    /* package */ long skipIntroIncrementMs;
     /* package */ long maxSeekToPreviousPositionMs;
     /* package */ LivePlaybackSpeedControl livePlaybackSpeedControl;
     /* package */ long releaseTimeoutMs;
@@ -543,6 +544,7 @@ public interface ExoPlayer extends Player {
      *   <li>{@link SeekParameters}: {@link SeekParameters#DEFAULT}
      *   <li>{@code seekBackIncrementMs}: {@link C#DEFAULT_SEEK_BACK_INCREMENT_MS}
      *   <li>{@code seekForwardIncrementMs}: {@link C#DEFAULT_SEEK_FORWARD_INCREMENT_MS}
+     *   <li>{@code skipIntroIncrementMs}: {@link C#DEFAULT_SKIP_INTRO_INCREMENT_MS}
      *   <li>{@code maxSeekToPreviousPositionMs}: {@link C#DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS}
      *   <li>{@code releaseTimeoutMs}: {@link #DEFAULT_RELEASE_TIMEOUT_MS}
      *   <li>{@code detachSurfaceTimeoutMs}: {@link #DEFAULT_DETACH_SURFACE_TIMEOUT_MS}
@@ -704,6 +706,7 @@ public interface ExoPlayer extends Player {
       seekParameters = SeekParameters.DEFAULT;
       seekBackIncrementMs = C.DEFAULT_SEEK_BACK_INCREMENT_MS;
       seekForwardIncrementMs = C.DEFAULT_SEEK_FORWARD_INCREMENT_MS;
+      skipIntroIncrementMs = C.DEFAULT_SKIP_INTRO_INCREMENT_MS;
       maxSeekToPreviousPositionMs = C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS;
       livePlaybackSpeedControl = new DefaultLivePlaybackSpeedControl.Builder().build();
       clock = Clock.DEFAULT;
@@ -1124,6 +1127,23 @@ public interface ExoPlayer extends Player {
       checkArgument(seekForwardIncrementMs > 0);
       checkState(!buildCalled);
       this.seekForwardIncrementMs = seekForwardIncrementMs;
+      return this;
+    }
+
+    /**
+     * Sets the {@link #skipIntro()} increment.
+     *
+     * @param skipIntroIncrementMs The skip intro increment, in milliseconds.
+     * @return This builder.
+     * @throws IllegalArgumentException If {@code skipIntroIncrementMs} is non-positive.
+     * @throws IllegalStateException If {@link #build()} has already been called.
+     */
+    @CanIgnoreReturnValue
+    @UnstableApi
+    public Builder setSkipIntroIncrementMs(@IntRange(from = 1) long skipIntroIncrementMs) {
+      checkArgument(skipIntroIncrementMs > 0);
+      checkState(!buildCalled);
+      this.skipIntroIncrementMs = skipIntroIncrementMs;
       return this;
     }
 

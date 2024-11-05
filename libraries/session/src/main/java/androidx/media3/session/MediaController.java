@@ -750,6 +750,30 @@ public class MediaController implements Player {
   /**
    * {@inheritDoc}
    *
+   * <p>Interoperability: When connected to {@link MediaSessionCompat}, it returns {code 0}.
+   */
+  @Override
+  public final long getSkipIntroIncrement() {
+    verifyApplicationThread();
+    return isConnected() ? impl.getSkipIntroIncrement() : 0;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Interoperability: When connected to {@code
+   * android.support.v4.media.session.MediaSessionCompat}, it calls {@code
+   * android.support.v4.media.session.MediaControllerCompat.TransportControls.fastForward()}.
+   */
+  @Override
+  public final long getSkipIntroIncrement() {
+    verifyApplicationThread();
+    return isConnected() ? impl.getSkipIntroIncrement() : 0;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
    * <p>Interoperability: When connected to {@code
    * android.support.v4.media.session.MediaSessionCompat}, it calls {@code
    * android.support.v4.media.session.MediaControllerCompat.TransportControls.fastForward()}.
@@ -762,6 +786,22 @@ public class MediaController implements Player {
       return;
     }
     impl.seekForward();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Interoperability: When connected to {@link MediaSessionCompat}, it calls {@link
+   * MediaControllerCompat.TransportControls#skipIntro()}.
+   */
+  @Override
+  public final void skipIntro() {
+    verifyApplicationThread();
+    if (!isConnected()) {
+      Log.w(TAG, "The controller is not connected. Ignoring skipIntro().");
+      return;
+    }
+    impl.skipIntro();
   }
 
   /** Returns an intent for launching UI associated with the session if exists, or {@code null}. */
@@ -2073,7 +2113,11 @@ public class MediaController implements Player {
 
     long getSeekForwardIncrement();
 
+    long getSkipIntroIncrement();
+
     void seekForward();
+
+    void skipIntro();
 
     @Nullable
     PendingIntent getSessionActivity();

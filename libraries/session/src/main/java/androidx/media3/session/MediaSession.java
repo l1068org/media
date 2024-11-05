@@ -2032,6 +2032,9 @@ public class MediaSession {
     default void onSeekForwardIncrementChanged(int seq, long seekForwardIncrementMs)
         throws RemoteException {}
 
+    default void onSkipIntroIncrementChanged(int seq, long skipIntroIncrementMs)
+        throws RemoteException {}
+
     default void onVideoSizeChanged(int seq, VideoSize videoSize) throws RemoteException {}
 
     default void onVolumeChanged(int seq, float volume) throws RemoteException {}

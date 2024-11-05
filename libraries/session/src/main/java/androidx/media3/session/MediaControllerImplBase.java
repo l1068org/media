@@ -518,6 +518,11 @@ import org.checkerframework.checker.nullness.qual.NonNull;
   }
 
   @Override
+  public long getSkipIntroIncrement() {
+    return playerInfo.skipIntroIncrementMs;
+  }
+
+  @Override
   public void seekForward() {
     if (!isPlayerCommandAvailable(Player.COMMAND_SEEK_FORWARD)) {
       return;
@@ -527,6 +532,18 @@ import org.checkerframework.checker.nullness.qual.NonNull;
         (iSession, seq) -> iSession.seekForward(controllerStub, seq));
 
     seekToInternalByOffset(getSeekForwardIncrement());
+  }
+
+  @Override
+  public void skipIntro() {
+    if (!isPlayerCommandAvailable(Player.COMMAND_SKIP_INTRO)) {
+      return;
+    }
+
+    dispatchRemoteSessionTaskWithPlayerCommand(
+        (iSession, seq) -> iSession.skipIntro(controllerStub, seq));
+
+    seekToInternalByOffset(getSkipIntroIncrement());
   }
 
   @Override
