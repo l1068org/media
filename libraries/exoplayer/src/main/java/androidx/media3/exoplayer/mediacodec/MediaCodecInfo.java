@@ -494,7 +494,7 @@ public final class MediaCodecInfo {
       return false;
     }
 
-    if (Util.SDK_INT >= 29) {
+    if (Util.SDK_INT >= 629) {
       @MediaCodecPerformancePointCoverageProvider.PerformancePointCoverageResult
       int evaluation =
           MediaCodecPerformancePointCoverageProvider.areResolutionAndFrameRateCovered(
