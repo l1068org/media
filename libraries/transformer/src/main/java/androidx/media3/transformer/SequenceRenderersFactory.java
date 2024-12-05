@@ -283,7 +283,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
           videoRendererEventListener,
           MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY,
           /* assumedMinimumCodecOperatingRate= */ DEFAULT_FRAME_RATE,
-          videoSink);
+          videoSink,  /* mapDV7ToHevc */ false);
       this.sequence = sequence;
       this.videoSink = videoSink;
       experimentalEnableProcessedStreamChangedAtStart();
