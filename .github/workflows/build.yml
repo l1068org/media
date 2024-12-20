@@ -62,17 +62,24 @@ jobs:
         cd "${AV1_MODULE_PATH}/jni/libgav1" && git clone https://github.com/abseil/abseil-cpp.git third_party/abseil-cpp
         popd
         pushd $PROJECT_NAME
+
+        echo "* Setting up AOMediaCodec libiamf"
+        IAMF_MODULE_PATH=$MEDIA3_ROOT/libraries/decoder_iamf/src/main          
+        cd "${IAMF_MODULE_PATH}/jni" && git clone https://github.com/AOMediaCodec/libiamf.git
+        popd
+        pushd $PROJECT_NAME
         
-        #./gradlew bundleReleaseAar
-        ./gradlew :lib-decoder-{ffmpeg,av1}:bundleReleaseAar
-        ./gradlew :lib-{common,exoplayer,extractor,ui,session,datasource,decoder,container}:bundleReleaseAar
-        ./gradlew :lib-{exoplayer-dash,exoplayer-hls,exoplayer-smoothstreaming,exoplayer-rtsp}:bundleReleaseAar
+        ./gradlew assembleRelease
+        #./gradlew :lib-decoder-{ffmpeg,av1}:bundleReleaseAar
+        #./gradlew :lib-{common,exoplayer,extractor,ui,session,datasource,decoder,container}:bundleReleaseAar
+        #./gradlew :lib-{exoplayer-dash,exoplayer-hls,exoplayer-smoothstreaming,exoplayer-rtsp}:bundleReleaseAar
         
         popd
         mkdir -p libs
-        cp $MEDIA3_ROOT/libraries/decoder_{ffmpeg,av1}/buildout/outputs/aar/*.aar libs/
-        cp $MEDIA3_ROOT/libraries/{common,exoplayer,extractor,ui,session,datasource,decoder,container}/buildout/outputs/aar/*.aar libs/
-        cp $MEDIA3_ROOT/libraries/{exoplayer_dash,exoplayer_hls,exoplayer_smoothstreaming,exoplayer_rtsp}/buildout/outputs/aar/*.aar libs/
+        cp $MEDIA3_ROOT/libraries/*/buildout/outputs/aar/*-release.aar libs/
+        #cp $MEDIA3_ROOT/libraries/decoder_{ffmpeg,av1}/buildout/outputs/aar/*.aar libs/
+        #cp $MEDIA3_ROOT/libraries/{common,exoplayer,extractor,ui,session,datasource,decoder,container}/buildout/outputs/aar/*.aar libs/
+        #cp $MEDIA3_ROOT/libraries/{exoplayer_dash,exoplayer_hls,exoplayer_smoothstreaming,exoplayer_rtsp}/buildout/outputs/aar/*.aar libs/
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
