@@ -69,7 +69,7 @@ jobs:
         popd
         pushd $PROJECT_NAME
         
-        ./gradlew assembleRelease
+        ./gradlew bundleReleaseAar
         #./gradlew :lib-decoder-{ffmpeg,av1}:bundleReleaseAar
         #./gradlew :lib-{common,exoplayer,extractor,ui,session,datasource,decoder,container}:bundleReleaseAar
         #./gradlew :lib-{exoplayer-dash,exoplayer-hls,exoplayer-smoothstreaming,exoplayer-rtsp}:bundleReleaseAar
