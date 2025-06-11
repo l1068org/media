@@ -55,6 +55,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -293,13 +294,18 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
 
   private final HlsMultivariantPlaylist multivariantPlaylist;
   @Nullable private final HlsMediaPlaylist previousMediaPlaylist;
+  private final List<String> ads;
 
   /**
    * Creates an instance where media playlists are parsed without inheriting attributes from a
    * multivariant playlist.
    */
   public HlsPlaylistParser() {
-    this(HlsMultivariantPlaylist.EMPTY, /* previousMediaPlaylist= */ null);
+    this(Collections.emptyList());
+  }
+
+  public HlsPlaylistParser(List<String> ads) {
+    this(HlsMultivariantPlaylist.EMPTY, null, ads);
   }
 
   /**
@@ -313,9 +319,31 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
    */
   public HlsPlaylistParser(
       HlsMultivariantPlaylist multivariantPlaylist,
-      @Nullable HlsMediaPlaylist previousMediaPlaylist) {
+      @Nullable HlsMediaPlaylist previousMediaPlaylist,
+      List<String> ads) {
     this.multivariantPlaylist = multivariantPlaylist;
     this.previousMediaPlaylist = previousMediaPlaylist;
+    this.ads = ads;
+  }
+
+  private String scan(String m3u8) {
+    Matcher m1 = Pattern.compile("#EXT-X-DISCONTINUITY[\\s\\S]*?(?=#EXT-X-DISCONTINUITY|$)").matcher(m3u8);
+    while (m1.find()) {
+      String group = m1.group();
+      BigDecimal t = BigDecimal.ZERO;
+      Matcher m2 = REGEX_MEDIA_DURATION.matcher(group);
+      while (m2.find()) t = t.add(new BigDecimal(m2.group(1)));
+      for (String ad : ads) if (t.toString().startsWith(ad)) m3u8 = m3u8.replace(group.replace(TAG_ENDLIST, ""), "");
+    }
+    return m3u8;
+  }
+
+  private boolean isDouble(String ad) {
+    try {
+      return Double.parseDouble(ad) > 0;
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   @Override
@@ -328,6 +356,19 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
         throw ParserException.createForMalformedManifest(
             /* message= */ "Input does not start with the #EXTM3U header.", /* cause= */ null);
       }
+
+      StringBuilder sb = new StringBuilder();
+      while ((line = reader.readLine()) != null) sb.append(line).append("\n");
+      String m3u8 = sb.toString();
+
+      boolean scan = false;
+      for (String ad : ads) {
+        if (ad.contains(TAG_DISCONTINUITY) || ad.contains(TAG_MEDIA_DURATION)) m3u8 = m3u8.replaceAll(ad, "");
+        else if (isDouble(ad)) scan = true;
+      }
+      if (scan) m3u8 = scan(m3u8);
+
+      reader = new BufferedReader(new StringReader(m3u8));
       while ((line = reader.readLine()) != null) {
         line = line.trim();
         if (line.isEmpty()) {
@@ -383,7 +424,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
 
   private static int skipIgnorableWhitespace(BufferedReader reader, boolean skipLinebreaks, int c)
       throws IOException {
-    while (c != -1 && Character.isWhitespace(c) && (skipLinebreaks || !Util.isLinebreak(c))) {
+    while (c == 0XFEFF || c != -1 && Character.isWhitespace(c) && (skipLinebreaks || !Util.isLinebreak(c))) {
       c = reader.read();
     }
     return c;

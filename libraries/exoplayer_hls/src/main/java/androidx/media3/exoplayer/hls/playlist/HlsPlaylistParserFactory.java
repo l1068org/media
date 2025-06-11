@@ -19,9 +19,13 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.upstream.ParsingLoadable;
 
+import java.util.List;
+
 /** Factory for {@link HlsPlaylist} parsers. */
 @UnstableApi
 public interface HlsPlaylistParserFactory {
+
+  void setAds(List<String> ads);
 
   /**
    * Returns a stand-alone playlist parser. Playlists parsed by the returned parser do not inherit

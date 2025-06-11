@@ -44,6 +44,10 @@ public final class FilteringHlsPlaylistParserFactory implements HlsPlaylistParse
   }
 
   @Override
+  public void setAds(List<String> ads) {
+  }
+
+  @Override
   public ParsingLoadable.Parser<HlsPlaylist> createPlaylistParser() {
     return new FilteringManifestParser<>(
         hlsPlaylistParserFactory.createPlaylistParser(), streamKeys);
