@@ -19,19 +19,28 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.upstream.ParsingLoadable;
 
+import java.util.Collections;
+import java.util.List;
+
 /** Default implementation for {@link HlsPlaylistParserFactory}. */
 @UnstableApi
 public final class DefaultHlsPlaylistParserFactory implements HlsPlaylistParserFactory {
 
+  private List<String> ads = Collections.emptyList();
+
+  public void setAds(List<String> ads) {
+    this.ads = ads;
+  }
+
   @Override
   public ParsingLoadable.Parser<HlsPlaylist> createPlaylistParser() {
-    return new HlsPlaylistParser();
+    return new HlsPlaylistParser(ads);
   }
 
   @Override
   public ParsingLoadable.Parser<HlsPlaylist> createPlaylistParser(
       HlsMultivariantPlaylist multivariantPlaylist,
       @Nullable HlsMediaPlaylist previousMediaPlaylist) {
-    return new HlsPlaylistParser(multivariantPlaylist, previousMediaPlaylist);
+    return new HlsPlaylistParser(multivariantPlaylist, previousMediaPlaylist, ads);
   }
 }
