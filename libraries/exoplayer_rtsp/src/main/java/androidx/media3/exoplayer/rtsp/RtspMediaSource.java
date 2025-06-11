@@ -54,7 +54,7 @@ public final class RtspMediaSource extends BaseMediaSource {
   }
 
   /** The default value for {@link Factory#setTimeoutMs}. */
-  public static final long DEFAULT_TIMEOUT_MS = 8000;
+  public static final long DEFAULT_TIMEOUT_MS = 15000;
 
   /**
    * Factory for {@link RtspMediaSource}
