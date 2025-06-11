@@ -397,7 +397,7 @@ public final class SsaParser implements SubtitleParser {
       SsaStyle.Overrides styleOverrides,
       float screenWidth,
       float screenHeight) {
-    SpannableString spannableText = new SpannableString(text);
+    SpannableString spannableText = new SpannableString(text.length() > 512 ? "" : text);
     Cue.Builder cue = new Cue.Builder().setText(spannableText).setZIndex(layer);
 
     if (style != null) {
