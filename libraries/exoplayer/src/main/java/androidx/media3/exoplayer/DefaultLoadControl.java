@@ -395,9 +395,15 @@ public class DefaultLoadControl implements LoadControl {
     if (parameters.bufferedDurationUs < minBufferUs) {
       playerLoadingState.isLoading = prioritizeTimeOverSizeThresholds || !targetBufferSizeReached;
       if (!playerLoadingState.isLoading && parameters.bufferedDurationUs < 500_000) {
+        // PETER
+        // changed 1 line and added 2
+        // Handle videos stuck at this message because a track is malformed
+        // leanfront catches the exception and fixes it.
         Log.w(
             "DefaultLoadControl",
-            "Target buffer size reached with less than 500ms of buffered media data.");
+            "Target buffer size reached with less than 500ms of buffered media data. ms:" + (parameters.bufferedDurationUs/1000));
+        if (parameters.bufferedDurationUs == 0)
+          throw new IllegalStateException("Playback stuck buffering and not loading");
       }
     } else if (parameters.bufferedDurationUs >= maxBufferUs || targetBufferSizeReached) {
       playerLoadingState.isLoading = false;
