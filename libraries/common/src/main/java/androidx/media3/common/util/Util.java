@@ -204,6 +204,7 @@ public final class Util {
       Pattern.compile("(?:.*\\.)?isml?(?:/(manifest(.*))?)?", Pattern.CASE_INSENSITIVE);
   private static final String ISM_HLS_FORMAT_EXTENSION = "format=m3u8-aapl";
   private static final String ISM_DASH_FORMAT_EXTENSION = "format=mpd-time-csf";
+  private static final String KALTURA = "applehttp";
 
   private static final int ZLIB_INFLATE_HEADER = 0x78;
 
@@ -2659,7 +2660,17 @@ public final class Util {
           return C.CONTENT_TYPE_HLS;
         }
       }
+
+      if (uri.toString().contains(KALTURA)) {
+          return C.CONTENT_TYPE_HLS;
+      }
+
       return C.CONTENT_TYPE_SS;
+    }
+
+    //Fix for youku.
+    if (uri.getPath().contains("/playlist/m3u8")) {
+        return C.CONTENT_TYPE_HLS;
     }
 
     return C.CONTENT_TYPE_OTHER;
@@ -2687,6 +2698,8 @@ public final class Util {
       case "mpd":
         return C.CONTENT_TYPE_DASH;
       case "m3u8":
+      case "php":
+      case "m3u":
         return C.CONTENT_TYPE_HLS;
       case "ism":
       case "isml":
