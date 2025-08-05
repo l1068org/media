@@ -104,14 +104,14 @@ public class DefaultRenderersFactory implements RenderersFactory {
 
   private static final String TAG = "DefaultRenderersFactory";
 
-  private final Context context;
+  protected final Context context;
   private final DefaultMediaCodecAdapterFactory codecAdapterFactory;
-  private @ExtensionRendererMode int extensionRendererMode;
-  private long allowedVideoJoiningTimeMs;
-  private boolean enableDecoderFallback;
-  private MediaCodecSelector mediaCodecSelector;
-  private boolean enableFloatOutput;
-  private boolean enableAudioTrackPlaybackParams;
+  protected @ExtensionRendererMode int extensionRendererMode;
+  protected long allowedVideoJoiningTimeMs;
+  protected boolean enableDecoderFallback;
+  protected MediaCodecSelector mediaCodecSelector;
+  protected boolean enableFloatOutput;
+  protected boolean enableAudioTrackPlaybackParams;
   private boolean enableMediaCodecVideoRendererPrewarming;
   private boolean parseAv1SampleDependencies;
   private long lateThresholdToDropDecoderInputUs;
