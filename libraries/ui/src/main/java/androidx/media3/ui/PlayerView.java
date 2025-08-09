@@ -38,6 +38,7 @@ import android.graphics.drawable.Drawable;
 import android.opengl.GLSurfaceView;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.view.AttachedSurfaceControl;
 import android.view.KeyEvent;
@@ -1795,8 +1796,20 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
     }
   }
 
+  public interface SizeGetter {
+    public VideoSize getVideoSize();
+  }
+  private SizeGetter sizeGetter;
+  public void setSizeGetter(SizeGetter sizeGetter) {
+    this.sizeGetter = sizeGetter;
+  }
+
   private void updateAspectRatio() {
-    VideoSize videoSize = player != null ? player.getVideoSize() : VideoSize.UNKNOWN;
+    VideoSize videoSize;
+    if (sizeGetter != null)
+      videoSize = sizeGetter.getVideoSize();
+    else
+      videoSize = player != null ? player.getVideoSize() : VideoSize.UNKNOWN;
     int width = videoSize.width;
     int height = videoSize.height;
     float videoAspectRatio =
