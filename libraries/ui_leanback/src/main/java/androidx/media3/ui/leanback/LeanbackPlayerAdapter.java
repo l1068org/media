@@ -219,6 +219,14 @@ public final class LeanbackPlayerAdapter extends PlayerAdapter implements Runnab
     surfaceHolderGlueHost.setSurfaceHolderCallback(null);
   }
 
+  public interface SizeGetter {
+    public VideoSize getVideoSize();
+  }
+  private SizeGetter sizeGetter;
+  public void setSizeGetter(SizeGetter sizeGetter) {
+    this.sizeGetter = sizeGetter;
+  }
+
   private final class PlayerListener implements Player.Listener, SurfaceHolder.Callback {
 
     // SurfaceHolder.Callback implementation.
@@ -286,6 +294,10 @@ public final class LeanbackPlayerAdapter extends PlayerAdapter implements Runnab
     @SuppressWarnings("nullness:dereference.of.nullable")
     @Override
     public void onVideoSizeChanged(VideoSize videoSize) {
+
+      if (sizeGetter != null)
+        videoSize = sizeGetter.getVideoSize();
+
       if (videoSize.width == 0 || videoSize.height == 0) {
         // Do not report unknown or placeholder sizes as Leanback can't handle these cases correctly
         // (see https://github.com/androidx/media/issues/617).
