@@ -171,8 +171,6 @@ public final class FfmpegLibrary {
         return "mpeg2video";
       case MimeTypes.VIDEO_ProRes:
         return "prores";
-      case MimeTypes.VIDEO_VC1:
-        return "vc1";
       case MimeTypes.VIDEO_MP4V:
       case MimeTypes.VIDEO_DIVX:
         return "mpeg4";
