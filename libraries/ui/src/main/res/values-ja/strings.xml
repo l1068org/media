@@ -58,4 +58,5 @@
   <string name="exo_track_role_closed_captions">字幕</string>
   <string name="exo_track_bitrate">%1$.2f Mbps</string>
   <string name="exo_item_list">%1$s、%2$s</string>
+  <string name="long_press_change_speed">長押ししながら、左右にドラッグすると再生速度を切り替えることができます</string>
 </resources>

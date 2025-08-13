@@ -35,11 +35,13 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.media.AudioManager;
 import android.opengl.GLSurfaceView;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.AttachedSurfaceControl;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -48,6 +50,8 @@ import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -71,9 +75,14 @@ import androidx.media3.common.Tracks;
 import androidx.media3.common.VideoSize;
 import androidx.media3.common.text.CueGroup;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.RepeatModeUtil;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.common.util.Util;
 import androidx.media3.ui.AspectRatioFrameLayout.ResizeMode;
+import androidx.media3.ui.overlayView.ProgressIconView;
+import androidx.media3.ui.overlayView.SpeedIndicator;
+import androidx.media3.ui.overlayView.VideoProgressImageView;
 import com.google.common.collect.ImmutableList;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -83,7 +92,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Formatter;
 import java.util.List;
+import java.util.Locale;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 
 /**
@@ -284,6 +296,8 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
    */
   @UnstableApi public static final int SHOW_BUFFERING_ALWAYS = 2;
 
+  private static final String TAG = "PlayerView";
+
   // LINT.ThenChange(../../../../res/values/attrs.xml)
 
   // LINT.IfChange
@@ -306,7 +320,11 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
   @Nullable private final View bufferingView;
   @Nullable private final TextView errorMessageView;
   @Nullable private final PlayerControlView controller;
+  @Nullable private final View exoControlTouchView;
   @Nullable private final FrameLayout adOverlayFrameLayout;
+  /**
+   * 覆盖在视频之上的布局  可用来显示定制UI
+   */
   @Nullable private final FrameLayout overlayFrameLayout;
   private final Handler mainLooperHandler;
   @Nullable private final Class<?> exoPlayerClazz;
@@ -352,7 +370,7 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
   public PlayerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
     super(context, attrs, defStyleAttr);
 
-    componentListener = new ComponentListener();
+    componentListener = new ComponentListener(context);
     mainLooperHandler = new Handler(Looper.getMainLooper());
 
     if (isInEditMode()) {
@@ -372,6 +390,7 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
       exoPlayerClazz = null;
       setImageOutputMethod = null;
       imageOutput = null;
+      exoControlTouchView = null;
       ImageView logo = new ImageView(context);
       if (SDK_INT >= 23) {
         configureEditModeLogoV23(context, getResources(), logo);
@@ -447,6 +466,8 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
       shutterView.setBackgroundColor(shutterColor);
     }
 
+    exoControlTouchView = findViewById(R.id.exo_control_touch_view);
+
     // Create a surface view and insert it into the content frame, if there is one.
     boolean surfaceViewIgnoresVideoAspectRatio = false;
     if (contentFrame != null && surfaceType != SURFACE_TYPE_NONE) {
@@ -494,7 +515,9 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
       // We don't want surfaceView to be clickable separately to the PlayerView itself, but we
       // do want to register as an OnClickListener so that surfaceView implementations can propagate
       // click events up to the PlayerView by calling their own performClick method.
-      surfaceView.setOnClickListener(componentListener);
+//      surfaceView.setOnClickListener(componentListener);
+//      surfaceView.setOnTouchListener(componentListener);
+      exoControlTouchView.setOnTouchListener(componentListener);
       surfaceView.setClickable(false);
       contentFrame.addView(surfaceView, 0);
     } else {
@@ -1386,7 +1409,7 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
    */
   @UnstableApi
   @Nullable
-  public FrameLayout getOverlayFrameLayout() {
+  private FrameLayout getOverlayFrameLayout() {
     return overlayFrameLayout;
   }
 
@@ -1843,20 +1866,62 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
         || keyCode == KeyEvent.KEYCODE_DPAD_CENTER;
   }
 
+  /**
+   * !手势修改点
+   * 亮度和音量在视图中间显示一个小弹窗
+   * 黑色半透明圆角背景  上方是图标  下方是进度条百分比
+   * 百分比为0时  图标与其它状态不一致
+   * <p>
+   * 长按时，在屏幕上方列出所有可变速度  通过左右滑动切换  设定切换阈值  松手还原原始速度
+   * <p>
+   * 左右滑动修改进度  显示当前时间和总时间  字体颜色区别
+   */
   // Implementing the deprecated PlayerControlView.VisibilityListener and
   // PlayerControlView.OnFullScreenModeChangedListener for now.
   @SuppressWarnings("deprecation")
   private final class ComponentListener
       implements Player.Listener,
           OnClickListener,
+          OnTouchListener,
           PlayerControlView.VisibilityListener,
-          PlayerControlView.OnFullScreenModeChangedListener {
+          PlayerControlView.OnFullScreenModeChangedListener,
+          OnControlGestureListener{
+
+    private final Context context;
+    private AudioManager audioManager;
+    private final float brightnessFactor = 300F;
+    private int maxVolume;
+    private float volumeFactor = 50F;
+    private float[] volumeChangeRange = {0, 0};
+
+    private final float speedChangeFactor = 80F;
+    private float speedMoveCount = 0F;
+    private SpeedIndicator speedIndicator = null;
+
+    private float videoPositionFactor = 10;
+    private float videoPositionMoveCount = 0;
+    private long videoPosition = 0;
+    private long videoDuration = 0;
+    private String videoDurationText = "";
+    private final StringBuilder formatBuilder;
+    private final Formatter formatter;
+    private VideoProgressImageView videoProgressImageView;
 
     private final Period period;
     private @Nullable Object lastPeriodUidWithTracks;
+    private final ControlGestureDetector controlGestureDetector;
 
-    public ComponentListener() {
+    public ComponentListener(Context context) {
+      this.context = context;
       period = new Period();
+      controlGestureDetector = new ControlGestureDetector(context, this);
+
+      // 初始化音频管理器
+      audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+      maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+
+      formatBuilder = new StringBuilder();
+      formatter = new Formatter(formatBuilder, Locale.getDefault());
     }
 
     // Player.Listener implementation
@@ -1963,7 +2028,275 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
 
     @Override
     public void onClick(View view) {
+      // 无法触发该回调，已被onTouch拦截
+      throw new RuntimeException("UnSupport click event");
+    }
+
+    // OnControlGestureListener implementation
+
+    @Override
+    public void onClick() {
+      Log.d(TAG, "onClick");
       toggleControllerVisibility();
+    }
+
+    @Override
+    public void onDoubleClick() {
+      Log.d(TAG, "onDoubleClick");
+      if (controller != null && player != null && !player.isPlaying()) {
+        controller.hide();
+      }
+      Util.handlePlayPauseButtonAction(player);
+    }
+
+    private boolean controllerIsFullyVisible() {
+      return controller != null && controller.isFullyVisible();
+    }
+
+    private ProgressIconView brightnessView;
+    private ProgressIconView volumeView;
+
+    @Override
+    public void onLeftVerticalSlide(float deltaY, float totalDeltaY) {
+      if (controllerIsFullyVisible()) {
+        return;
+      }
+
+      float changeValue = -deltaY / brightnessFactor;
+
+//      Log.d(TAG, "onLeftVerticalSlide deltaY : " + deltaY
+//          + ", totalDeltaY : " + totalDeltaY + ", changeValue : " + changeValue);
+      setBrightness(changeValue);
+    }
+
+    private void setBrightness(float changeValue) {
+      Window window = BrightnessUtil.getActivityFromContext(context).getWindow();
+      float currentBrightness = BrightnessUtil.getWindowBrightness(window);
+      if (currentBrightness == WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE) {
+        currentBrightness = BrightnessUtil.getSystemBrightness(context) / 255F;
+      }
+
+      currentBrightness += changeValue;
+      currentBrightness = Math.max(0, Math.min(1, currentBrightness));
+      Log.d(TAG, "setBrightness : " + currentBrightness);
+      BrightnessUtil.setWindowBrightness(window, currentBrightness);
+
+      brightnessView = updateProgressView(brightnessView,
+          (int) (currentBrightness * 100), 100,
+          R.drawable.brightness_min, R.drawable.brightness_normal);
+    }
+
+    private ProgressIconView updateProgressView(
+        @Nullable ProgressIconView view,
+        int current,
+        int max,
+        int minIcon,
+        int normalIcon
+    ) {
+      if (view == null) {
+        view = new ProgressIconView(context);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+            LayoutParams.WRAP_CONTENT,
+            LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER);
+        overlayFrameLayout.addView(view, params);
+      }
+      view.setMaxProgress(max);
+      view.setCurrentProgress(current);
+      view.setIcon(current == 0 ? minIcon : normalIcon);
+      view.setVisibility(VISIBLE);
+      return view;
+    }
+
+    @Override
+    public void onRightVerticalSlide(float deltaY, float totalDeltaY) {
+//      Log.d(TAG, "onRightVerticalSlide deltaY : " + deltaY + ", totalDeltaY : " + totalDeltaY);
+      if (controllerIsFullyVisible()) {
+        return;
+      }
+
+      // first callback
+      if (deltaY == totalDeltaY) {
+        int beforeVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+        volumeChangeRange = new float[]{maxVolume * volumeFactor, beforeVolume * volumeFactor};
+        Log.d(TAG, "onRightVerticalSlide before : " + beforeVolume
+            + ", changeRange : " + Arrays.toString(volumeChangeRange));
+      }
+
+      if (deltaY == 0) return;
+
+      volumeChangeRange[1] -= deltaY;
+      volumeChangeRange[1] = Math.max(0, Math.min(volumeChangeRange[0], volumeChangeRange[1]));
+
+      // 获取当前音量比例 (0-1)
+
+      int currentVolume = Math.round(volumeChangeRange[1] / volumeFactor);
+
+      setVolume(currentVolume);
+    }
+
+    // 设置音量 (0 ~ maxVolume)
+    private void setVolume(int volume) {
+      volume = Math.max(0, Math.min(maxVolume, volume));
+      Log.d(TAG, "setVolume : " + volume);
+      audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, 0);
+
+      volumeView = updateProgressView(volumeView,
+          volume, maxVolume,
+          R.drawable.volume_mute, R.drawable.volume_normal);
+    }
+
+    @Override
+    public void onHorizontalSlide(float deltaX, float totalDeltaX) {
+      if (player == null || controllerIsFullyVisible()) {
+        return;
+      }
+
+      Log.d(TAG, "onHorizontalSlide deltaX : " + deltaX + ", totalDeltaX : " + totalDeltaX);
+
+      if (deltaX == totalDeltaX) {
+        Log.d(TAG, "onHorizontalSlide reset");
+        videoPositionMoveCount = 0;
+
+        videoPosition = player.getCurrentPosition();
+        videoDuration = player.getDuration();
+        videoDurationText = Util.getStringForTime(formatBuilder, formatter, videoDuration);
+      }
+
+      if (videoDuration <= 0) {
+        Log.d(TAG, "onHorizontalSlide videoDuration : " + videoDuration);
+        return;
+      }
+
+      videoPositionMoveCount += deltaX;
+
+      int step = (int) (videoPositionMoveCount / videoPositionFactor);
+
+      if (step != 0) {
+        videoPositionMoveCount %= videoPositionFactor;
+
+        videoPosition += step * 1000L;
+        videoPosition = Math.max(0, Math.min(videoPosition, videoDuration));
+        String positionText = Util.getStringForTime(formatBuilder, formatter, videoPosition);
+
+        // update UI
+        Log.d(TAG, "onHorizontalSlide " + positionText + " / " + videoDurationText);
+
+        if (videoProgressImageView == null) {
+          videoProgressImageView = new VideoProgressImageView(context);
+          FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+              LayoutParams.WRAP_CONTENT,
+              LayoutParams.WRAP_CONTENT,
+              Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM);
+          params.bottomMargin = dp2px(16);
+          overlayFrameLayout.addView(videoProgressImageView, params);
+        }
+        videoProgressImageView.setVisibility(VISIBLE);
+        videoProgressImageView.setProgressText(positionText);
+        videoProgressImageView.setDurationText(videoDurationText);
+      }
+    }
+
+    @Override
+    public void onLongPress() {
+      Log.d(TAG, "onLongPress");
+      if (controllerIsFullyVisible() || player == null || !player.isPlaying()) {
+        return;
+      }
+      if (controller != null) {
+        speedMoveCount = 0;
+        // FIXME 添加震动
+        int index = controller.startLongPressChangeSpeed();
+
+        if (speedIndicator == null) {
+          Log.d(TAG, "初始化 speedIndicator");
+          speedIndicator = new SpeedIndicator(context);
+          String tips = context.getResources().getString(R.string.long_press_change_speed);
+          speedIndicator.setTips(tips);
+          FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+              LayoutParams.WRAP_CONTENT,
+              LayoutParams.WRAP_CONTENT,
+              Gravity.CENTER_HORIZONTAL);
+          params.topMargin = dp2px(16);
+          overlayFrameLayout.addView(speedIndicator, params);
+        }
+        speedIndicator.setVisibility(VISIBLE);
+        speedIndicator.updateData(controller.getPlaybackSpeedTexts());
+        speedIndicator.updatePosition(index);
+      }
+    }
+
+    private int dp2px(int dp) {
+      return Math.round(context.getResources().getDisplayMetrics().density * dp + 0.5F);
+    }
+
+    @Override
+    public void onLongPressAndThenHorizontalSlide(float deltaX, float totalDeltaX) {
+      if (controllerIsFullyVisible()) {
+        return;
+      }
+
+      Log.d(TAG, "onLongPressAndThenHorizontalSlide deltaX : " + deltaX + ", totalDeltaX : " + totalDeltaX);
+
+      if (controller != null) {
+
+        speedMoveCount += deltaX;
+        int step = (int) (speedMoveCount / speedChangeFactor);
+
+        if (step != 0) {
+          speedMoveCount %= speedChangeFactor;
+          int index = controller.updateLongPressSpeed(step);
+          if (speedIndicator != null) {
+            speedIndicator.updatePosition(index);
+          }
+        }
+      }
+    }
+
+    @Override
+    public void onMoveUp(ControlGestureDetector.SlideType type) {
+      Log.d(TAG, "onMoveUp type : " + type);
+
+      hideAllViews();
+
+      switch (type) {
+        case HORIZONTAL:
+          if (!controllerIsFullyVisible() && player != null) {
+            player.seekTo(videoPosition);
+          }
+          break;
+
+        case PRESS_HORIZONTAL:
+          if (!controllerIsFullyVisible() && controller != null) {
+            int index = controller.stopLongPressChangeSpeed();
+            if (speedIndicator != null) {
+              speedIndicator.updatePosition(index);
+            }
+          }
+          break;
+      }
+
+      resetCustomParams();
+    }
+
+    private void hideAllViews() {
+      View[] views = {brightnessView, volumeView, speedIndicator, videoProgressImageView};
+      for (View view : views) {
+        if (view != null) {
+          view.setVisibility(GONE);
+        }
+      }
+    }
+
+    private void resetCustomParams() {
+      videoPosition = 0;
+      videoDuration = 0;
+      videoPositionMoveCount = 0;
+
+      speedMoveCount = 0;
+
+      int beforeVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+      volumeChangeRange = new float[]{maxVolume * volumeFactor, beforeVolume * volumeFactor};
     }
 
     // PlayerControlView.VisibilityListener implementation
@@ -1983,6 +2316,13 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
       if (fullscreenButtonClickListener != null) {
         fullscreenButtonClickListener.onFullscreenButtonClick(isFullscreen);
       }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    @Override
+    public boolean onTouch(View view, MotionEvent motionEvent) {
+      controlGestureDetector.onTouchEvent(motionEvent);
+      return true;
     }
   }
 

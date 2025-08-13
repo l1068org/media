@@ -375,6 +375,13 @@ public class PlayerControlView extends FrameLayout {
       new float[] {0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f};
   // LINT.ThenChange("../../../../res/values/strings.xml:playback_speeds")
 
+  // 是否正在长按加速
+  private boolean longPressChangeSpeed = false;
+  // 长按加速的速率数组索引
+  private int longPressChangeSpeedIndex = 0;
+  // 长按前的速率数组索引
+  private int beforeSpeedIndex = 0;
+
   private static final int SETTINGS_PLAYBACK_SPEED_POSITION = 0;
   private static final int SETTINGS_AUDIO_TRACK_SELECTION_POSITION = 1;
 
@@ -1602,6 +1609,42 @@ public class PlayerControlView extends FrameLayout {
       return;
     }
     player.setPlaybackParameters(player.getPlaybackParameters().withSpeed(speed));
+  }
+
+  public int startLongPressChangeSpeed() {
+    if (longPressChangeSpeed) return 0;
+
+    longPressChangeSpeed = true;
+    longPressChangeSpeedIndex = playbackSpeedAdapter.playbackSpeeds.length - 1;
+    beforeSpeedIndex = playbackSpeedAdapter.selectedIndex;
+    setPlaybackSpeed(playbackSpeedAdapter.playbackSpeeds[longPressChangeSpeedIndex]);
+
+    return longPressChangeSpeedIndex;
+  }
+
+  public int stopLongPressChangeSpeed() {
+    if (!longPressChangeSpeed) return 0;
+
+    longPressChangeSpeed = false;
+    setPlaybackSpeed(playbackSpeedAdapter.playbackSpeeds[beforeSpeedIndex]);
+
+    return beforeSpeedIndex;
+  }
+
+  public int updateLongPressSpeed(int step) {
+    if (!longPressChangeSpeed) return 0;
+
+    longPressChangeSpeedIndex += step;
+    longPressChangeSpeedIndex = Math.max(0,
+        Math.min(playbackSpeedAdapter.playbackSpeeds.length - 1, longPressChangeSpeedIndex));
+
+    setPlaybackSpeed(playbackSpeedAdapter.playbackSpeeds[longPressChangeSpeedIndex]);
+
+    return longPressChangeSpeedIndex;
+  }
+
+  public String[] getPlaybackSpeedTexts() {
+    return playbackSpeedAdapter.playbackSpeedTexts;
   }
 
   /* package */ void requestPlayPauseFocus() {

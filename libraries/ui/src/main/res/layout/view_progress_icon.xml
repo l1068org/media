@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:orientation="vertical"
+  android:layout_width="wrap_content"
+  android:layout_height="wrap_content"
+  android:gravity="center"
+  android:layout_gravity="center"
+  android:background="@drawable/progress_icon_bg">
+
+  <!-- 图标 -->
+  <ImageView
+    android:id="@+id/icon_image_view"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center_horizontal"/>
+
+  <!-- 进度条 -->
+  <ProgressBar
+    android:id="@+id/progress_bar"
+    style="?android:attr/progressBarStyleHorizontal"
+    android:layout_width="100dp"
+    android:layout_height="8dp"
+    android:layout_marginTop="12dp"
+    android:progressDrawable="@drawable/progress_bar_white"
+    android:max="100"
+    android:progress="0"/>
+
+</LinearLayout>

@@ -65,6 +65,11 @@
 
   </androidx.media3.ui.AspectRatioFrameLayout>
 
+  <View
+    android:id="@+id/exo_control_touch_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"/>
+
   <FrameLayout android:id="@id/exo_ad_overlay"
     android:layout_width="match_parent"
     android:layout_height="match_parent"/>
