@@ -11,7 +11,7 @@ import java.util.Set;
 
 public final class HlsAdsParser {
 
-  private static final String TAG = "HlsAdsParser";
+  private static final String TAG = HlsAdsParser.class.getSimpleName();
 
   private static final String TAG_EXT_INF = "#EXTINF";
   private static final String TAG_END_LIST = "#EXT-X-ENDLIST";
@@ -24,7 +24,7 @@ public final class HlsAdsParser {
   private static final double MIN_MAJORITY_GROUP_RATIO = 0.85;
 
   public static String process(String m3u8) {
-    Log.d(TAG, "Executing HlsAdsParser [Final Code-Style Optimized Version]...");
+    Log.d(TAG, "Executing HlsAdsParser...");
     if (TextUtils.isEmpty(m3u8) || !m3u8.contains(TAG_END_LIST)) {
       return m3u8;
     }
@@ -34,7 +34,10 @@ public final class HlsAdsParser {
       Log.d(TAG, "No ad segments detected. Returning original content.");
       return m3u8;
     }
-    Log.d(TAG, "Detected " + adSegments.size() + " ad segments. Rebuilding playlist.");
+    Log.d(TAG, "Detected " + adSegments.size() + " ad segments to remove. Rebuilding playlist...");
+    for (String adSegment : adSegments) {
+      Log.d(TAG, "  -> Removing: " + adSegment);
+    }
     return rebuildM3u8(lines, adSegments);
   }
 
@@ -62,18 +65,30 @@ public final class HlsAdsParser {
       Log.d(TAG, "Discontinuity Analysis: Only " + blocks.size() + " block(s) found. Strategy inconclusive.");
       return new HashSet<>();
     }
-    List<String> minorityBlock = null;
+    int minSize = Integer.MAX_VALUE;
     for (List<String> block : blocks) {
-      Log.d(TAG, "Discontinuity Analysis: Found a block with " + block.size() + " segments.");
-      if (minorityBlock == null || block.size() < minorityBlock.size()) {
-        minorityBlock = block;
+      if (block.size() < minSize) {
+        minSize = block.size();
       }
     }
-    if (!minorityBlock.isEmpty()) {
-      Log.d(TAG, "Discontinuity Analysis: Minority block with " + minorityBlock.size() + " segments identified as ads.");
-      return new HashSet<>(minorityBlock);
+    if (minSize == 0) {
+      return new HashSet<>();
     }
-    return new HashSet<>();
+    int minorityBlockCount = 0;
+    Set<String> adSegments = new HashSet<>();
+    for (List<String> block : blocks) {
+      if (block.size() == minSize) {
+        minorityBlockCount++;
+        adSegments.addAll(block);
+      }
+    }
+    if (minorityBlockCount > 0 && minorityBlockCount <= 3) {
+      Log.d(TAG, "Discontinuity Analysis: Found " + minorityBlockCount + " minority block(s) with size " + minSize + ". Identified as ads.");
+      return adSegments;
+    } else {
+      Log.d(TAG, "Discontinuity Analysis: Found " + minorityBlockCount + " minority blocks. Count (" + minorityBlockCount + ") exceeds threshold of 3. Result is ambiguous, ignoring.");
+      return new HashSet<>();
+    }
   }
 
   private static List<List<String>> getDiscontinuityBlocks(String[] lines) {
