@@ -18,11 +18,11 @@ public final class HlsAdsParser {
 
   private static final String TAG = HlsAdsParser.class.getSimpleName();
 
-  private static final String TAG_EXT_INF = "#EXTINF";
-  private static final String TAG_END_LIST = "#EXT-X-ENDLIST";
+  private static final String TAG_DURATION = "#EXTINF";
+  private static final String TAG_ENDLIST = "#EXT-X-ENDLIST";
   private static final String TAG_DISCONTINUITY = "#EXT-X-DISCONTINUITY";
   private static final String DEFAULT_GROUP_IDENTIFIER = "NO_PATH";
-  private static final Pattern REGEX_MEDIA_DURATION = Pattern.compile("#EXTINF:([\\d\\.]+)\\b");
+  private static final Pattern REGEX_DURATION = Pattern.compile(TAG_DURATION + ":([\\d\\.]+)\\b");
 
   private static final int REASONABLE_GROUP_LIMIT = 10;
   private static final int MIN_PREFIX_LENGTH_TO_TEST = 5;
@@ -31,7 +31,7 @@ public final class HlsAdsParser {
 
   public static String process(String m3u8) {
     Log.d(TAG, "Executing HlsAdsParser...");
-    if (TextUtils.isEmpty(m3u8) || !m3u8.contains(TAG_END_LIST)) {
+    if (TextUtils.isEmpty(m3u8) || !m3u8.contains(TAG_ENDLIST)) {
       return m3u8;
     }
     String[] lines = m3u8.split("\\r?\\n");
@@ -66,9 +66,6 @@ public final class HlsAdsParser {
   }
 
   private static Set<String> findAdsByDiscontinuity(String[] lines) {
-    double totalDurationMinutes = getTotalDurationInMinutes(lines);
-    int minorityCountThreshold = getMinorityCountThreshold(totalDurationMinutes);
-    Log.d(TAG, "Total duration is " + String.format(Locale.getDefault(), "%.2f", totalDurationMinutes) + " minutes. Ad block threshold is " + minorityCountThreshold + ".");
     List<List<String>> blocks = getDiscontinuityBlocks(lines);
     if (blocks.size() < 2) {
       Log.d(TAG, "Discontinuity Analysis: Only " + blocks.size() + " block(s) found. Strategy inconclusive.");
@@ -91,6 +88,9 @@ public final class HlsAdsParser {
         adSegments.addAll(block);
       }
     }
+    double totalDurationMinutes = getTotalDurationInMinutes(lines);
+    int minorityCountThreshold = getMinorityCountThreshold(totalDurationMinutes);
+    Log.d(TAG, "Total duration is " + String.format(Locale.getDefault(), "%.2f", totalDurationMinutes) + " minutes. Ad block threshold is " + minorityCountThreshold + ".");
     if (minorityBlockCount > 0 && minorityBlockCount <= minorityCountThreshold) {
       Log.d(TAG, "Discontinuity Analysis: Found " + minorityBlockCount + " minority block(s) with size " + minSize + ". This is within the threshold of " + minorityCountThreshold + ".");
       return adSegments;
@@ -103,8 +103,8 @@ public final class HlsAdsParser {
   private static double getTotalDurationInMinutes(String[] lines) {
     BigDecimal totalSeconds = BigDecimal.ZERO;
     for (String line : lines) {
-      if (line.startsWith(TAG_EXT_INF)) {
-        Matcher matcher = REGEX_MEDIA_DURATION.matcher(line);
+      if (line.startsWith(TAG_DURATION)) {
+        Matcher matcher = REGEX_DURATION.matcher(line);
         if (matcher.find()) {
           try {
             totalSeconds = totalSeconds.add(new BigDecimal(matcher.group(1)));
@@ -261,7 +261,7 @@ public final class HlsAdsParser {
       if (line.isEmpty()) {
         continue;
       }
-      if (line.startsWith(TAG_EXT_INF)) {
+      if (line.startsWith(TAG_DURATION)) {
         if (i + 1 < lines.length) {
           String nextLine = lines[i + 1].trim();
           if (adSegments.contains(nextLine)) {
