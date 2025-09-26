@@ -146,6 +146,7 @@ public class IntentUtil {
     MediaItem.Builder builder =
         new MediaItem.Builder()
             .setUri(uri)
+            .setAdblock(true)
             .setMimeType(mimeType)
             .setMediaMetadata(new MediaMetadata.Builder().setTitle(title).build())
             .setClippingConfiguration(
