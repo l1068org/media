@@ -1,5 +1,6 @@
 package androidx.media3.exoplayer.hls.playlist;
 
+import android.text.TextUtils;
 import androidx.media3.common.util.Log;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,32 +9,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class HlsAdsParser {
+public final class HlsAdsParser {
 
-  private static final String TAG = HlsAdsParser.class.getSimpleName();
+  private static final String TAG = "HlsAdsParser";
   private static final String TAG_MEDIA_DURATION = "#EXTINF";
   private static final String TAG_ENDLIST = "#EXT-X-ENDLIST";
-
+  private static final String DEFAULT_GROUP_IDENTIFIER = "NO_PATH";
   private static final int REASONABLE_GROUP_LIMIT = 10;
   private static final int MIN_PREFIX_LENGTH_TO_TEST = 5;
   private static final int SEQUENCE_NUMBER_RESERVED_LENGTH = 4;
   private static final double MIN_MAJORITY_GROUP_RATIO = 0.85;
 
   public static String process(String m3u8) {
-    if (!m3u8.contains(TAG_ENDLIST)) {
+    if (TextUtils.isEmpty(m3u8) || !m3u8.contains(TAG_ENDLIST)) {
       return m3u8;
     }
     String[] lines = m3u8.split("\\r?\\n");
-    Set<String> adSegments = findAdsByFilename(lines);
+    Set<String> adSegments = findAds(lines);
     if (adSegments.isEmpty()) {
-      Log.d(TAG, "未偵測到有效廣告，返回原始內容。");
+      Log.d(TAG, "No ad segments detected. Returning original content.");
       return m3u8;
     }
-    Log.d(TAG, "找到 " + adSegments.size() + " 個廣告片段，開始重建 M3U8。");
+    Log.d(TAG, "Detected " + adSegments.size() + " ad segments. Rebuilding playlist.");
     return rebuildM3u8(lines, adSegments);
   }
 
-  private static Set<String> findAdsByFilename(String[] lines) {
+  private static Set<String> findAds(String[] lines) {
     List<String> allSegments = new ArrayList<>();
     for (String line : lines) {
       String trimmedLine = line.trim();
@@ -41,20 +42,55 @@ public class HlsAdsParser {
         allSegments.add(trimmedLine);
       }
     }
-    if (allSegments.isEmpty()) {
-      Log.w(TAG, "M3U8 中未找到任何 .ts 片段。");
+    if (allSegments.size() < 2) {
       return new HashSet<>();
     }
-    int optimalPrefixLength = findOptimalPrefixLength(allSegments);
+    Log.d(TAG, "Executing Strategy A: Structural Analysis (by path)");
+    Map<String, List<String>> structuralGroups = new HashMap<>();
+    for (String segment : allSegments) {
+      String identifier = getStructuralIdentifier(segment);
+      if (!structuralGroups.containsKey(identifier)) {
+        structuralGroups.put(identifier, new ArrayList<>());
+      }
+      structuralGroups.get(identifier).add(segment);
+    }
+    if (structuralGroups.size() > 1) {
+      Log.d(TAG, "Strategy A successful: Found " + structuralGroups.size() + " structural groups.");
+      return findMinorityGroup(structuralGroups);
+    }
+    Log.d(TAG, "Strategy A did not yield multiple groups. Falling back to Strategy B: Prefix Analysis.");
+    return findAdsByPrefixAnalysis(allSegments);
+  }
+
+  private static String getStructuralIdentifier(String segmentUrl) {
+    int lastSlashIndex = segmentUrl.lastIndexOf('/');
+    return lastSlashIndex != -1 ? segmentUrl.substring(0, lastSlashIndex) : DEFAULT_GROUP_IDENTIFIER;
+  }
+
+  private static Set<String> findMinorityGroup(Map<String, List<String>> groups) {
+    Map.Entry<String, List<String>> minEntry = null;
+    for (Map.Entry<String, List<String>> entry : groups.entrySet()) {
+      if (minEntry == null || entry.getValue().size() < minEntry.getValue().size()) {
+        minEntry = entry;
+      }
+    }
+    if (minEntry != null && groups.size() > 1) {
+      Log.d(TAG, "Minority group identified as ads: '" + minEntry.getKey() + "' (" + minEntry.getValue().size() + " segments)");
+      return new HashSet<>(minEntry.getValue());
+    }
+    return new HashSet<>();
+  }
+
+  private static Set<String> findAdsByPrefixAnalysis(List<String> segments) {
+    int optimalPrefixLength = findOptimalPrefixLength(segments);
     if (optimalPrefixLength == -1) {
-      Log.d(TAG, "檔名分析：未找到一個佔據絕對多數的內容群組，認定沒有廣告。");
+      Log.d(TAG, "Prefix Analysis: No dominant group found based on quality score. No ads detected.");
       return new HashSet<>();
     }
-    Map<String, Integer> identifierCounts = groupSegmentsByIdentifier(allSegments, optimalPrefixLength);
+    Map<String, Integer> identifierCounts = groupSegmentsByIdentifier(segments, optimalPrefixLength);
     if (identifierCounts.size() <= 1 || identifierCounts.size() > REASONABLE_GROUP_LIMIT) {
       return new HashSet<>();
     }
-    Log.d(TAG, "檔名分析：自動檢測到最佳長度為 " + optimalPrefixLength + "，共分出 " + identifierCounts.size() + " 組，判斷有效。");
     Map.Entry<String, Integer> maxEntry = null;
     for (Map.Entry<String, Integer> entry : identifierCounts.entrySet()) {
       if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0) {
@@ -63,8 +99,8 @@ public class HlsAdsParser {
     }
     String mainContentIdentifier = (maxEntry != null) ? maxEntry.getKey() : "";
     Set<String> adSegments = new HashSet<>();
-    for (String segment : allSegments) {
-      if (!getSegmentIdentifier(segment, optimalPrefixLength).equals(mainContentIdentifier)) {
+    for (String segment : segments) {
+      if (!getPrefixIdentifier(segment, optimalPrefixLength).equals(mainContentIdentifier)) {
         adSegments.add(segment);
       }
     }
@@ -105,20 +141,15 @@ public class HlsAdsParser {
   private static Map<String, Integer> groupSegmentsByIdentifier(List<String> allSegments, int prefixLength) {
     Map<String, Integer> identifierCounts = new HashMap<>();
     for (String segment : allSegments) {
-      String identifier = getSegmentIdentifier(segment, prefixLength);
+      String identifier = getPrefixIdentifier(segment, prefixLength);
       Integer count = identifierCounts.get(identifier);
       identifierCounts.put(identifier, (count == null) ? 1 : count + 1);
     }
     return identifierCounts;
   }
 
-  private static String getSegmentIdentifier(String segmentUrl, int prefixLength) {
-    int lastSlashIndex = segmentUrl.lastIndexOf('/');
-    if (lastSlashIndex != -1) {
-      return segmentUrl.substring(0, lastSlashIndex);
-    } else {
-      return segmentUrl.length() > prefixLength ? segmentUrl.substring(0, prefixLength) : segmentUrl;
-    }
+  private static String getPrefixIdentifier(String segmentUrl, int prefixLength) {
+    return segmentUrl.length() > prefixLength ? segmentUrl.substring(0, prefixLength) : segmentUrl;
   }
 
   private static String rebuildM3u8(String[] lines, Set<String> adSegments) {

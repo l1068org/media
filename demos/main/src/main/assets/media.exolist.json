@@ -1,5 +1,26 @@
 [
   {
+    "name": "HLS Adblock",
+    "samples": [
+      {
+        "name": "1",
+        "uri": "https://8.bf8bf.com/video/xunguan/HD/index.m3u8"
+      },
+      {
+        "name": "2",
+        "uri": "https://v.cdnlz18.com/20240727/14879_e529730a/index.m3u8"
+      },
+      {
+        "name": "3",
+        "uri": "https://v8.lj20250710new.com/20250925/SArCPH2E/index.m3u8"
+      },
+      {
+        "name": "4",
+        "uri": "https://svipsvip.ffzyread1.com/20221108/2535_97119ad3/index.m3u8"
+      }
+    ]
+  },
+  {
     "name": "Clear DASH",
     "samples": [
       {
