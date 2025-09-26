@@ -12,16 +12,20 @@ import java.util.Set;
 public final class HlsAdsParser {
 
   private static final String TAG = "HlsAdsParser";
-  private static final String TAG_MEDIA_DURATION = "#EXTINF";
-  private static final String TAG_ENDLIST = "#EXT-X-ENDLIST";
+
+  private static final String TAG_EXT_INF = "#EXTINF";
+  private static final String TAG_END_LIST = "#EXT-X-ENDLIST";
+  private static final String TAG_DISCONTINUITY = "#EXT-X-DISCONTINUITY";
   private static final String DEFAULT_GROUP_IDENTIFIER = "NO_PATH";
+
   private static final int REASONABLE_GROUP_LIMIT = 10;
   private static final int MIN_PREFIX_LENGTH_TO_TEST = 5;
   private static final int SEQUENCE_NUMBER_RESERVED_LENGTH = 4;
   private static final double MIN_MAJORITY_GROUP_RATIO = 0.85;
 
   public static String process(String m3u8) {
-    if (TextUtils.isEmpty(m3u8) || !m3u8.contains(TAG_ENDLIST)) {
+    Log.d(TAG, "Executing HlsAdsParser [Final Code-Style Optimized Version]...");
+    if (TextUtils.isEmpty(m3u8) || !m3u8.contains(TAG_END_LIST)) {
       return m3u8;
     }
     String[] lines = m3u8.split("\\r?\\n");
@@ -35,6 +39,7 @@ public final class HlsAdsParser {
   }
 
   private static Set<String> findAds(String[] lines) {
+    Log.d(TAG, "===== Executing Primary Strategy: Filename/Path Analysis =====");
     List<String> allSegments = new ArrayList<>();
     for (String line : lines) {
       String trimmedLine = line.trim();
@@ -42,10 +47,59 @@ public final class HlsAdsParser {
         allSegments.add(trimmedLine);
       }
     }
+    Set<String> adsFromFilename = findAdsByFilename(allSegments);
+    if (!adsFromFilename.isEmpty()) {
+      Log.d(TAG, "Primary strategy successful. Using its result.");
+      return adsFromFilename;
+    }
+    Log.d(TAG, "Primary strategy did not find ads. Falling back to Discontinuity Analysis.");
+    return findAdsByDiscontinuity(lines);
+  }
+
+  private static Set<String> findAdsByDiscontinuity(String[] lines) {
+    List<List<String>> blocks = getDiscontinuityBlocks(lines);
+    if (blocks.size() < 2) {
+      Log.d(TAG, "Discontinuity Analysis: Only " + blocks.size() + " block(s) found. Strategy inconclusive.");
+      return new HashSet<>();
+    }
+    List<String> minorityBlock = null;
+    for (List<String> block : blocks) {
+      Log.d(TAG, "Discontinuity Analysis: Found a block with " + block.size() + " segments.");
+      if (minorityBlock == null || block.size() < minorityBlock.size()) {
+        minorityBlock = block;
+      }
+    }
+    if (!minorityBlock.isEmpty()) {
+      Log.d(TAG, "Discontinuity Analysis: Minority block with " + minorityBlock.size() + " segments identified as ads.");
+      return new HashSet<>(minorityBlock);
+    }
+    return new HashSet<>();
+  }
+
+  private static List<List<String>> getDiscontinuityBlocks(String[] lines) {
+    List<List<String>> blocks = new ArrayList<>();
+    List<String> currentBlock = new ArrayList<>();
+    for (String line : lines) {
+      String trimmedLine = line.trim();
+      if (trimmedLine.equals(TAG_DISCONTINUITY)) {
+        if (!currentBlock.isEmpty()) {
+          blocks.add(currentBlock);
+        }
+        currentBlock = new ArrayList<>();
+      } else if (!trimmedLine.startsWith("#") && trimmedLine.endsWith(".ts")) {
+        currentBlock.add(trimmedLine);
+      }
+    }
+    if (!currentBlock.isEmpty()) {
+      blocks.add(currentBlock);
+    }
+    return blocks;
+  }
+
+  private static Set<String> findAdsByFilename(List<String> allSegments) {
     if (allSegments.size() < 2) {
       return new HashSet<>();
     }
-    Log.d(TAG, "Executing Strategy A: Structural Analysis (by path)");
     Map<String, List<String>> structuralGroups = new HashMap<>();
     for (String segment : allSegments) {
       String identifier = getStructuralIdentifier(segment);
@@ -55,10 +109,8 @@ public final class HlsAdsParser {
       structuralGroups.get(identifier).add(segment);
     }
     if (structuralGroups.size() > 1) {
-      Log.d(TAG, "Strategy A successful: Found " + structuralGroups.size() + " structural groups.");
       return findMinorityGroup(structuralGroups);
     }
-    Log.d(TAG, "Strategy A did not yield multiple groups. Falling back to Strategy B: Prefix Analysis.");
     return findAdsByPrefixAnalysis(allSegments);
   }
 
@@ -75,7 +127,6 @@ public final class HlsAdsParser {
       }
     }
     if (minEntry != null && groups.size() > 1) {
-      Log.d(TAG, "Minority group identified as ads: '" + minEntry.getKey() + "' (" + minEntry.getValue().size() + " segments)");
       return new HashSet<>(minEntry.getValue());
     }
     return new HashSet<>();
@@ -84,7 +135,6 @@ public final class HlsAdsParser {
   private static Set<String> findAdsByPrefixAnalysis(List<String> segments) {
     int optimalPrefixLength = findOptimalPrefixLength(segments);
     if (optimalPrefixLength == -1) {
-      Log.d(TAG, "Prefix Analysis: No dominant group found based on quality score. No ads detected.");
       return new HashSet<>();
     }
     Map<String, Integer> identifierCounts = groupSegmentsByIdentifier(segments, optimalPrefixLength);
@@ -159,7 +209,7 @@ public final class HlsAdsParser {
       if (line.isEmpty()) {
         continue;
       }
-      if (line.startsWith(TAG_MEDIA_DURATION)) {
+      if (line.startsWith(TAG_EXT_INF)) {
         if (i + 1 < lines.length) {
           String nextLine = lines[i + 1].trim();
           if (adSegments.contains(nextLine)) {
