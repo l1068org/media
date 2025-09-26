@@ -2,12 +2,17 @@ package androidx.media3.exoplayer.hls.playlist;
 
 import android.text.TextUtils;
 import androidx.media3.common.util.Log;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class HlsAdsParser {
 
@@ -17,6 +22,7 @@ public final class HlsAdsParser {
   private static final String TAG_END_LIST = "#EXT-X-ENDLIST";
   private static final String TAG_DISCONTINUITY = "#EXT-X-DISCONTINUITY";
   private static final String DEFAULT_GROUP_IDENTIFIER = "NO_PATH";
+  private static final Pattern REGEX_MEDIA_DURATION = Pattern.compile("#EXTINF:([\\d\\.]+)\\b");
 
   private static final int REASONABLE_GROUP_LIMIT = 10;
   private static final int MIN_PREFIX_LENGTH_TO_TEST = 5;
@@ -60,6 +66,9 @@ public final class HlsAdsParser {
   }
 
   private static Set<String> findAdsByDiscontinuity(String[] lines) {
+    double totalDurationMinutes = getTotalDurationInMinutes(lines);
+    int minorityCountThreshold = getMinorityCountThreshold(totalDurationMinutes);
+    Log.d(TAG, "Total duration is " + String.format(Locale.getDefault(), "%.2f", totalDurationMinutes) + " minutes. Ad block threshold is " + minorityCountThreshold + ".");
     List<List<String>> blocks = getDiscontinuityBlocks(lines);
     if (blocks.size() < 2) {
       Log.d(TAG, "Discontinuity Analysis: Only " + blocks.size() + " block(s) found. Strategy inconclusive.");
@@ -82,12 +91,40 @@ public final class HlsAdsParser {
         adSegments.addAll(block);
       }
     }
-    if (minorityBlockCount > 0 && minorityBlockCount <= 3) {
-      Log.d(TAG, "Discontinuity Analysis: Found " + minorityBlockCount + " minority block(s) with size " + minSize + ". Identified as ads.");
+    if (minorityBlockCount > 0 && minorityBlockCount <= minorityCountThreshold) {
+      Log.d(TAG, "Discontinuity Analysis: Found " + minorityBlockCount + " minority block(s) with size " + minSize + ". This is within the threshold of " + minorityCountThreshold + ".");
       return adSegments;
     } else {
-      Log.d(TAG, "Discontinuity Analysis: Found " + minorityBlockCount + " minority blocks. Count (" + minorityBlockCount + ") exceeds threshold of 3. Result is ambiguous, ignoring.");
+      Log.d(TAG, "Discontinuity Analysis: Found " + minorityBlockCount + " minority blocks. Count exceeds threshold of " + minorityCountThreshold + ". Result is ambiguous, ignoring.");
       return new HashSet<>();
+    }
+  }
+
+  private static double getTotalDurationInMinutes(String[] lines) {
+    BigDecimal totalSeconds = BigDecimal.ZERO;
+    for (String line : lines) {
+      if (line.startsWith(TAG_EXT_INF)) {
+        Matcher matcher = REGEX_MEDIA_DURATION.matcher(line);
+        if (matcher.find()) {
+          try {
+            totalSeconds = totalSeconds.add(new BigDecimal(matcher.group(1)));
+          } catch (Exception ignored) {
+          }
+        }
+      }
+    }
+    return totalSeconds.divide(new BigDecimal("60"), 2, RoundingMode.HALF_UP).doubleValue();
+  }
+
+  private static int getMinorityCountThreshold(double totalMinutes) {
+    if (totalMinutes <= 30) {
+      return 1;
+    } else if (totalMinutes <= 60) {
+      return 2;
+    } else if (totalMinutes <= 90) {
+      return 3;
+    } else {
+      return 4;
     }
   }
 
