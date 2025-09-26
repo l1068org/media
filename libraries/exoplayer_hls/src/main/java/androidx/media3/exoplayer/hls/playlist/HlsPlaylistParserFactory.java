@@ -25,7 +25,7 @@ import java.util.List;
 @UnstableApi
 public interface HlsPlaylistParserFactory {
 
-  void setAds(List<String> ads);
+  void setAdblock(boolean adblock);
 
   /**
    * Returns a stand-alone playlist parser. Playlists parsed by the returned parser do not inherit

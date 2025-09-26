@@ -420,7 +420,7 @@ public final class HlsMediaSource extends BaseMediaSource
               ? null
               : cmcdConfigurationFactory.createCmcdConfiguration(mediaItem);
 
-      playlistParserFactory.setAds(mediaItem.ads);
+      playlistParserFactory.setAdblock(mediaItem.adblock);
 
       return new HlsMediaSource(
           mediaItem,

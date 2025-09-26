@@ -294,18 +294,18 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
 
   private final HlsMultivariantPlaylist multivariantPlaylist;
   @Nullable private final HlsMediaPlaylist previousMediaPlaylist;
-  private final List<String> ads;
+  private final boolean adblock;
 
   /**
    * Creates an instance where media playlists are parsed without inheriting attributes from a
    * multivariant playlist.
    */
   public HlsPlaylistParser() {
-    this(Collections.emptyList());
+    this(false);
   }
 
-  public HlsPlaylistParser(List<String> ads) {
-    this(HlsMultivariantPlaylist.EMPTY, null, ads);
+  public HlsPlaylistParser(boolean adblock) {
+    this(HlsMultivariantPlaylist.EMPTY, null, adblock);
   }
 
   /**
@@ -320,30 +320,10 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
   public HlsPlaylistParser(
       HlsMultivariantPlaylist multivariantPlaylist,
       @Nullable HlsMediaPlaylist previousMediaPlaylist,
-      List<String> ads) {
+      boolean adblock) {
     this.multivariantPlaylist = multivariantPlaylist;
     this.previousMediaPlaylist = previousMediaPlaylist;
-    this.ads = ads;
-  }
-
-  private String scan(String m3u8) {
-    Matcher m1 = Pattern.compile("#EXT-X-DISCONTINUITY[\\s\\S]*?(?=#EXT-X-DISCONTINUITY|$)").matcher(m3u8);
-    while (m1.find()) {
-      String group = m1.group();
-      BigDecimal t = BigDecimal.ZERO;
-      Matcher m2 = REGEX_MEDIA_DURATION.matcher(group);
-      while (m2.find()) t = t.add(new BigDecimal(m2.group(1)));
-      for (String ad : ads) if (t.toString().startsWith(ad)) m3u8 = m3u8.replace(group.replace(TAG_ENDLIST, ""), "");
-    }
-    return m3u8;
-  }
-
-  private boolean isDouble(String ad) {
-    try {
-      return Double.parseDouble(ad) > 0;
-    } catch (Exception e) {
-      return false;
-    }
+    this.adblock = adblock;
   }
 
   @Override
@@ -357,18 +337,13 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
             /* message= */ "Input does not start with the #EXTM3U header.", /* cause= */ null);
       }
 
-      StringBuilder sb = new StringBuilder();
-      while ((line = reader.readLine()) != null) sb.append(line).append("\n");
-      String m3u8 = sb.toString();
-
-      boolean scan = false;
-      for (String ad : ads) {
-        if (ad.contains(TAG_DISCONTINUITY) || ad.contains(TAG_MEDIA_DURATION)) m3u8 = m3u8.replaceAll(ad, "");
-        else if (isDouble(ad)) scan = true;
+      if (adblock) {
+        StringBuilder sb = new StringBuilder();
+        while ((line = reader.readLine()) != null) sb.append(line).append("\n");
+        String m3u8 = HlsAdsParser.process(sb.toString());
+        reader = new BufferedReader(new StringReader(m3u8));
       }
-      if (scan) m3u8 = scan(m3u8);
 
-      reader = new BufferedReader(new StringReader(m3u8));
       while ((line = reader.readLine()) != null) {
         line = line.trim();
         if (line.isEmpty()) {

@@ -26,21 +26,21 @@ import java.util.List;
 @UnstableApi
 public final class DefaultHlsPlaylistParserFactory implements HlsPlaylistParserFactory {
 
-  private List<String> ads = Collections.emptyList();
+  private boolean adblock;
 
-  public void setAds(List<String> ads) {
-    this.ads = ads;
+  public void setAdblock(boolean adblock) {
+    this.adblock = adblock;
   }
 
   @Override
   public ParsingLoadable.Parser<HlsPlaylist> createPlaylistParser() {
-    return new HlsPlaylistParser(ads);
+    return new HlsPlaylistParser(adblock);
   }
 
   @Override
   public ParsingLoadable.Parser<HlsPlaylist> createPlaylistParser(
       HlsMultivariantPlaylist multivariantPlaylist,
       @Nullable HlsMediaPlaylist previousMediaPlaylist) {
-    return new HlsPlaylistParser(multivariantPlaylist, previousMediaPlaylist, ads);
+    return new HlsPlaylistParser(multivariantPlaylist, previousMediaPlaylist, adblock);
   }
 }
