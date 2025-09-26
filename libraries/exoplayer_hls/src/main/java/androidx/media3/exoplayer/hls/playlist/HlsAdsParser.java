@@ -11,7 +11,6 @@ import java.util.Set;
 public class HlsAdsParser {
 
   private static final String TAG = HlsAdsParser.class.getSimpleName();
-
   private static final String TAG_MEDIA_DURATION = "#EXTINF";
   private static final String TAG_ENDLIST = "#EXT-X-ENDLIST";
 
@@ -24,18 +23,18 @@ public class HlsAdsParser {
     if (!m3u8.contains(TAG_ENDLIST)) {
       return m3u8;
     }
-    Set<String> adSegments = findAdsByFilename(m3u8);
+    String[] lines = m3u8.split("\\r?\\n");
+    Set<String> adSegments = findAdsByFilename(lines);
     if (adSegments.isEmpty()) {
-      Log.e(TAG, "未偵測到有效廣告，返回原始內容");
+      Log.d(TAG, "未偵測到有效廣告，返回原始內容。");
       return m3u8;
     }
-    Log.e(TAG, "成功識別到 " + adSegments.size() + " 個廣告片段，開始重建 M3U8。");
-    return rebuildM3u8(m3u8, adSegments);
+    Log.d(TAG, "找到 " + adSegments.size() + " 個廣告片段，開始重建 M3U8。");
+    return rebuildM3u8(lines, adSegments);
   }
 
-  private static Set<String> findAdsByFilename(String m3u8Content) {
+  private static Set<String> findAdsByFilename(String[] lines) {
     List<String> allSegments = new ArrayList<>();
-    String[] lines = m3u8Content.split("\\r?\\n");
     for (String line : lines) {
       String trimmedLine = line.trim();
       if (!trimmedLine.startsWith("#") && trimmedLine.endsWith(".ts")) {
@@ -43,19 +42,19 @@ public class HlsAdsParser {
       }
     }
     if (allSegments.isEmpty()) {
-      Log.e(TAG, "M3U8 中未找到任何 .ts 片段。");
+      Log.w(TAG, "M3U8 中未找到任何 .ts 片段。");
       return new HashSet<>();
     }
     int optimalPrefixLength = findOptimalPrefixLength(allSegments);
     if (optimalPrefixLength == -1) {
-      Log.e(TAG, "檔名分析：未找到一個佔據絕對多數的內容群組，認定沒有廣告。");
+      Log.d(TAG, "檔名分析：未找到一個佔據絕對多數的內容群組，認定沒有廣告。");
       return new HashSet<>();
     }
     Map<String, Integer> identifierCounts = groupSegmentsByIdentifier(allSegments, optimalPrefixLength);
     if (identifierCounts.size() <= 1 || identifierCounts.size() > REASONABLE_GROUP_LIMIT) {
       return new HashSet<>();
     }
-    Log.e(TAG, "檔名分析：自動檢測到最佳長度為 " + optimalPrefixLength + "，共分出 " + identifierCounts.size() + " 組，判斷有效。");
+    Log.d(TAG, "檔名分析：自動檢測到最佳長度為 " + optimalPrefixLength + "，共分出 " + identifierCounts.size() + " 組，判斷有效。");
     Map.Entry<String, Integer> maxEntry = null;
     for (Map.Entry<String, Integer> entry : identifierCounts.entrySet()) {
       if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0) {
@@ -122,9 +121,8 @@ public class HlsAdsParser {
     }
   }
 
-  private static String rebuildM3u8(String m3u8, Set<String> adSegments) {
+  private static String rebuildM3u8(String[] lines, Set<String> adSegments) {
     StringBuilder builder = new StringBuilder();
-    String[] lines = m3u8.split("\\r?\\n");
     for (int i = 0; i < lines.length; i++) {
       String line = lines[i].trim();
       if (line.isEmpty()) {
