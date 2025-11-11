@@ -18,6 +18,7 @@ group = 'com.github.l1068'
 
 android {
     compileSdkVersion project.ext.compileSdkVersion
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         minSdkVersion project.ext.minSdkVersion

@@ -106,13 +106,20 @@ public final class DefaultDrmSessionManagerProvider implements DrmSessionManager
         drmHttpDataSourceFactory != null
             ? drmHttpDataSourceFactory
             : new DefaultHttpDataSource.Factory().setUserAgent(userAgent);
-    HttpMediaDrmCallback httpDrmCallback =
-        new HttpMediaDrmCallback(
-            drmConfiguration.licenseUri == null ? null : drmConfiguration.licenseUri.toString(),
-            drmConfiguration.forceDefaultLicenseUri,
-            dataSourceFactory);
-    for (Map.Entry<String, String> entry : drmConfiguration.licenseRequestHeaders.entrySet()) {
-      httpDrmCallback.setKeyRequestProperty(entry.getKey(), entry.getValue());
+    MediaDrmCallback drmCallback;
+    String licenseUrl = drmConfiguration.licenseUri == null ? "" : drmConfiguration.licenseUri.toString();
+    if (licenseUrl.startsWith("http")) {
+      HttpMediaDrmCallback httpDrmCallback =
+          new HttpMediaDrmCallback(
+              drmConfiguration.licenseUri.toString(),
+              drmConfiguration.forceDefaultLicenseUri,
+              dataSourceFactory);
+      for (Map.Entry<String, String> entry : drmConfiguration.licenseRequestHeaders.entrySet()) {
+        httpDrmCallback.setKeyRequestProperty(entry.getKey(), entry.getValue());
+      }
+      drmCallback = httpDrmCallback;
+    } else {
+      drmCallback = new LocalMediaDrmCallback(licenseUrl.getBytes());
     }
     DefaultDrmSessionManager.Builder drmSessionManagerBuilder =
         new DefaultDrmSessionManager.Builder()
@@ -125,7 +132,7 @@ public final class DefaultDrmSessionManagerProvider implements DrmSessionManager
     if (drmLoadErrorHandlingPolicy != null) {
       drmSessionManagerBuilder.setLoadErrorHandlingPolicy(drmLoadErrorHandlingPolicy);
     }
-    DefaultDrmSessionManager drmSessionManager = drmSessionManagerBuilder.build(httpDrmCallback);
+    DefaultDrmSessionManager drmSessionManager = drmSessionManagerBuilder.build(drmCallback);
     drmSessionManager.setMode(MODE_PLAYBACK, drmConfiguration.getKeySetId());
     return drmSessionManager;
   }

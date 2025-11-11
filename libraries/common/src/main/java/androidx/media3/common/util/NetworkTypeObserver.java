@@ -98,7 +98,8 @@ public final class NetworkTypeObserver {
     backgroundExecutor = BackgroundExecutor.get();
     listeners = new CopyOnWriteArrayList<>();
     lock = new Object();
-    networkType = C.NETWORK_TYPE_UNKNOWN;
+    //Fix network type - fongmi
+    networkType = getNetworkTypeFromConnectivityManager(context);
     backgroundExecutor.execute(() -> init(context));
   }
 
