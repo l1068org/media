@@ -1849,9 +1849,7 @@ public class MatroskaExtractor implements Extractor {
 
     if (track.waitingForDtsAnalysis) {
       checkNotNull(track.format);
-      if (DtsUtil.isSampleDtsHd(input, size)) {
-        track.format = track.format.buildUpon().setSampleMimeType(MimeTypes.AUDIO_DTS_HD).build();
-      }
+      track.format = DtsUtil.updateFormatWithDtsHdInfo(input, size, track.format);
       track.output.format(track.format);
       track.waitingForDtsAnalysis = false;
       maybeEndTracks();
@@ -2519,9 +2517,11 @@ public class MatroskaExtractor implements Extractor {
           trueHdSampleRechunker = new TrueHdSampleRechunker();
           break;
         case CODEC_ID_DTS:
-        case CODEC_ID_DTS_EXPRESS:
           mimeType = MimeTypes.AUDIO_DTS; // temporary
           waitingForDtsAnalysis = true;
+          break;
+        case CODEC_ID_DTS_EXPRESS:
+          mimeType = MimeTypes.AUDIO_DTS_EXPRESS;
           break;
         case CODEC_ID_DTS_LOSSLESS:
           mimeType = MimeTypes.AUDIO_MEDIA3_DTS_HD_MA_CORELESS;
