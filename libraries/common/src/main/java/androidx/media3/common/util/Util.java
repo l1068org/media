@@ -1705,7 +1705,9 @@ public final class Util {
    */
   @UnstableApi
   public static long nsToMs(long timeNs) {
-    return (timeNs == C.TIME_UNSET || timeNs == C.TIME_END_OF_SOURCE) ? timeNs : (timeNs / 1_000_000);
+    return (timeNs == C.TIME_UNSET || timeNs == C.TIME_END_OF_SOURCE)
+        ? timeNs
+        : (timeNs / 1_000_000);
   }
 
   /**
