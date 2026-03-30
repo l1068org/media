@@ -2312,7 +2312,7 @@ public class MatroskaExtractor implements Extractor {
     public long trackUid;
     public @MonotonicNonNull String chapString;
 
-    protected ChapterEntry() {
+    public ChapterEntry() {
       timeStartNs = C.TIME_UNSET;
       timeEndNs = C.TIME_UNSET;
     }
