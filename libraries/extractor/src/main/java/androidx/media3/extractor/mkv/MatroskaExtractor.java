@@ -964,7 +964,7 @@ public class MatroskaExtractor implements Extractor {
         break;
       case ID_CHAPTER_ATOM:
         ChapterEntry chapter = checkNotNull(currentChapter);
-        if (chapter.uid > 0) {
+        if (chapter.uid != 0) {
           chapters.put(chapter.uid, chapter);
         }
         currentChapter = null;
@@ -1139,7 +1139,7 @@ public class MatroskaExtractor implements Extractor {
         timecodeScale = value;
         break;
       case ID_CHAPTER_UID:
-        getCurrentChapter(id).uid = (int) value;
+        getCurrentChapter(id).uid = value;
         break;
       case ID_CHAPTER_TIME_START:
         getCurrentChapter(id).timeStartNs = value;
@@ -2314,10 +2314,8 @@ public class MatroskaExtractor implements Extractor {
     public @MonotonicNonNull String chapString;
 
     protected ChapterEntry() {
-      uid = 0;
       timeStartNs = C.TIME_UNSET;
       timeEndNs = C.TIME_UNSET;
-      trackUid = 0;
     }
   }
 
@@ -2338,7 +2336,7 @@ public class MatroskaExtractor implements Extractor {
     public @MonotonicNonNull String name;
     public @MonotonicNonNull String codecId;
     public int number;
-    public long uid = 0;
+    public long uid;
     public @C.TrackType int type;
     public int defaultSampleDurationNs;
     public int maxBlockAdditionId;
