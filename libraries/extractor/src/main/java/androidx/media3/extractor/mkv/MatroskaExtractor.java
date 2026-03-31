@@ -1721,7 +1721,7 @@ public class MatroskaExtractor implements Extractor {
   /**
    * Returns the chapter corresponding to the current EditionEntry element.
    *
-   * @throws ParserException if the element id is not in a EditionEntry.
+   * @throws ParserException if the element id is not in an EditionEntry.
    */
   protected ChapterEntry getCurrentChapter(int currentElementId) throws ParserException {
     assertInEditionEntry(currentElementId);
