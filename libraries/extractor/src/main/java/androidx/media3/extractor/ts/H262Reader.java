@@ -277,6 +277,21 @@ public final class H262Reader implements ElementaryStreamReader {
         break;
     }
 
+    float frameRate = Format.NO_VALUE;
+    long frameDurationUs = 0;
+    int frameRateCodeMinusOne = (csdData[7] & 0x0F) - 1;
+    if (0 <= frameRateCodeMinusOne && frameRateCodeMinusOne < FRAME_RATE_VALUES.length) {
+      double frameRateValue = FRAME_RATE_VALUES[frameRateCodeMinusOne];
+      int sequenceExtensionPosition = csdBuffer.sequenceExtensionPosition;
+      int frameRateExtensionN = (csdData[sequenceExtensionPosition + 9] & 0x60) >> 5;
+      int frameRateExtensionD = (csdData[sequenceExtensionPosition + 9] & 0x1F);
+      if (frameRateExtensionN != frameRateExtensionD) {
+        frameRateValue *= (frameRateExtensionN + 1d) / (frameRateExtensionD + 1);
+      }
+      frameRate = (float) frameRateValue;
+      frameDurationUs = (long) (C.MICROS_PER_SECOND / frameRateValue);
+    }
+
     Format format =
         new Format.Builder()
             .setId(formatId)
@@ -284,22 +299,10 @@ public final class H262Reader implements ElementaryStreamReader {
             .setSampleMimeType(sampleMimeType)
             .setWidth(width)
             .setHeight(height)
+            .setFrameRate(frameRate)
             .setPixelWidthHeightRatio(pixelWidthHeightRatio)
             .setInitializationData(Collections.singletonList(csdData))
             .build();
-
-    long frameDurationUs = 0;
-    int frameRateCodeMinusOne = (csdData[7] & 0x0F) - 1;
-    if (0 <= frameRateCodeMinusOne && frameRateCodeMinusOne < FRAME_RATE_VALUES.length) {
-      double frameRate = FRAME_RATE_VALUES[frameRateCodeMinusOne];
-      int sequenceExtensionPosition = csdBuffer.sequenceExtensionPosition;
-      int frameRateExtensionN = (csdData[sequenceExtensionPosition + 9] & 0x60) >> 5;
-      int frameRateExtensionD = (csdData[sequenceExtensionPosition + 9] & 0x1F);
-      if (frameRateExtensionN != frameRateExtensionD) {
-        frameRate *= (frameRateExtensionN + 1d) / (frameRateExtensionD + 1);
-      }
-      frameDurationUs = (long) (C.MICROS_PER_SECOND / frameRate);
-    }
 
     return Pair.create(format, frameDurationUs);
   }
