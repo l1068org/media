@@ -28,6 +28,10 @@ This release includes the following changes since [1.10.0](#1100-2026-03-25):
     *   Fix `ArrayIndexOutOfBoundsException` in `Mp4Extractor` when
         `FLAG_OMIT_TRACK_SAMPLE_TABLE` is set and the track lacks a sync sample
         (`stss`) box.
+    *   MPEG-TS: Improve extraction of DTS-HD and DTS Express streams by
+        combining the Core and Extension Substream into a single sample, fixing
+        playback issues where the two were previously output as separate samples
+        ([#3147](https://github.com/androidx/media/pull/3147)).
 *   Audio:
     *   Fix bug where audio events may be misrouted if multiple audio renderers
         are added to the player.
