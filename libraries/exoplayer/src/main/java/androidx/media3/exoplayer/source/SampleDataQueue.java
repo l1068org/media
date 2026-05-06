@@ -51,6 +51,7 @@ import java.util.Arrays;
 
   // Accessed only by the loading thread (or the consuming thread when there is no loading thread).
   private long totalBytesWritten;
+  private byte[] jniScratch;
 
   public SampleDataQueue(Allocator allocator) {
     this.allocator = allocator;
@@ -174,11 +175,26 @@ import java.util.Arrays;
 
   public int sampleData(DataReader input, int length, boolean allowEndOfInput) throws IOException {
     length = preAppend(length);
-    int bytesAppended =
-        input.read(
-            writeAllocationNode.allocation.data,
-            writeAllocationNode.translateOffset(totalBytesWritten),
-            length);
+    int bytesAppended;
+    Allocation allocation = writeAllocationNode.allocation;
+    if (allocation.buffer != null) {
+      if (jniScratch == null || jniScratch.length < length) {
+        jniScratch = new byte[length];
+      }
+      bytesAppended = input.read(jniScratch, 0, length);
+      if (bytesAppended > 0) {
+        synchronized (allocation.buffer) {
+          allocation.buffer.position(writeAllocationNode.translateOffset(totalBytesWritten));
+          allocation.buffer.put(jniScratch, 0, bytesAppended);
+        }
+      }
+    } else {
+      bytesAppended =
+          input.read(
+              allocation.data,
+              writeAllocationNode.translateOffset(totalBytesWritten),
+              length);
+    }
     if (bytesAppended == C.RESULT_END_OF_INPUT) {
       if (allowEndOfInput) {
         return C.RESULT_END_OF_INPUT;
@@ -192,10 +208,19 @@ import java.util.Arrays;
   public void sampleData(ParsableByteArray buffer, int length) {
     while (length > 0) {
       int bytesAppended = preAppend(length);
-      buffer.readBytes(
-          writeAllocationNode.allocation.data,
-          writeAllocationNode.translateOffset(totalBytesWritten),
-          bytesAppended);
+      Allocation allocation = writeAllocationNode.allocation;
+      if (allocation.buffer != null) {
+        synchronized (allocation.buffer) {
+          allocation.buffer.position(writeAllocationNode.translateOffset(totalBytesWritten));
+          allocation.buffer.put(buffer.getData(), buffer.getPosition(), bytesAppended);
+        }
+        buffer.skipBytes(bytesAppended);
+      } else {
+        buffer.readBytes(
+            allocation.data,
+            writeAllocationNode.translateOffset(totalBytesWritten),
+            bytesAppended);
+      }
       length -= bytesAppended;
       postAppend(bytesAppended);
     }
@@ -405,7 +430,17 @@ import java.util.Arrays;
     while (remaining > 0) {
       int toCopy = min(remaining, (int) (allocationNode.endPosition - absolutePosition));
       Allocation allocation = allocationNode.allocation;
-      target.put(allocation.data, allocationNode.translateOffset(absolutePosition), toCopy);
+      if (allocation.buffer != null) {
+        synchronized (allocation.buffer) {
+          allocation.buffer.position(allocationNode.translateOffset(absolutePosition));
+          allocation.buffer.limit(allocation.buffer.position() + toCopy);
+          target.put(allocation.buffer);
+          // Restore limit just in case
+          allocation.buffer.limit(allocation.buffer.capacity());
+        }
+      } else {
+        target.put(allocation.data, allocationNode.translateOffset(absolutePosition), toCopy);
+      }
       remaining -= toCopy;
       absolutePosition += toCopy;
       if (absolutePosition == allocationNode.endPosition) {
@@ -431,12 +466,19 @@ import java.util.Arrays;
     while (remaining > 0) {
       int toCopy = min(remaining, (int) (allocationNode.endPosition - absolutePosition));
       Allocation allocation = allocationNode.allocation;
-      System.arraycopy(
-          allocation.data,
-          allocationNode.translateOffset(absolutePosition),
-          target,
-          length - remaining,
-          toCopy);
+      if (allocation.buffer != null) {
+        synchronized (allocation.buffer) {
+          allocation.buffer.position(allocationNode.translateOffset(absolutePosition));
+          allocation.buffer.get(target, length - remaining, toCopy);
+        }
+      } else {
+        System.arraycopy(
+            allocation.data,
+            allocationNode.translateOffset(absolutePosition),
+            target,
+            length - remaining,
+            toCopy);
+      }
       remaining -= toCopy;
       absolutePosition += toCopy;
       if (absolutePosition == allocationNode.endPosition) {

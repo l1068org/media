@@ -15,6 +15,7 @@
  */
 package androidx.media3.exoplayer.upstream;
 
+import androidx.annotation.Nullable;
 import androidx.media3.common.util.UnstableApi;
 
 /**
@@ -30,7 +31,12 @@ public final class Allocation {
    * The array containing the allocated space. The allocated space might not be at the start of the
    * array, and so {@link #offset} must be used when indexing into it.
    */
-  public final byte[] data;
+  @Nullable public final byte[] data;
+
+  /**
+   * Off-heap direct ByteBuffer containing the allocated space.
+   */
+  @Nullable public final java.nio.ByteBuffer buffer;
 
   /** The offset of the allocated space in {@link #data}. */
   public final int offset;
@@ -39,8 +45,19 @@ public final class Allocation {
    * @param data The array containing the allocated space.
    * @param offset The offset of the allocated space in {@code data}.
    */
-  public Allocation(byte[] data, int offset) {
+  public Allocation(@Nullable byte[] data, int offset) {
     this.data = data;
+    this.buffer = null;
+    this.offset = offset;
+  }
+
+  /**
+   * @param buffer The off-heap buffer containing the allocated space.
+   * @param offset The offset of the allocated space.
+   */
+  public Allocation(@Nullable java.nio.ByteBuffer buffer, int offset) {
+    this.data = null;
+    this.buffer = buffer;
     this.offset = offset;
   }
 }

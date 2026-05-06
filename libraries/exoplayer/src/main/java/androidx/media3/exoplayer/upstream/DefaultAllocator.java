@@ -71,10 +71,9 @@ public final class DefaultAllocator implements Allocator {
     this.availableCount = initialAllocationCount;
     this.availableAllocations = new Allocation[initialAllocationCount + AVAILABLE_EXTRA_CAPACITY];
     if (initialAllocationCount > 0) {
-      initialAllocationBlock = new byte[initialAllocationCount * individualAllocationSize];
+      initialAllocationBlock = null;
       for (int i = 0; i < initialAllocationCount; i++) {
-        int allocationOffset = i * individualAllocationSize;
-        availableAllocations[i] = new Allocation(initialAllocationBlock, allocationOffset);
+        availableAllocations[i] = new Allocation(createUntrackedBuffer(individualAllocationSize), 0);
       }
     } else {
       initialAllocationBlock = null;
@@ -103,7 +102,7 @@ public final class DefaultAllocator implements Allocator {
       allocation = Assertions.checkNotNull(availableAllocations[--availableCount]);
       availableAllocations[availableCount] = null;
     } else {
-      allocation = new Allocation(new byte[individualAllocationSize], 0);
+      allocation = new Allocation(createUntrackedBuffer(individualAllocationSize), 0);
       if (allocatedCount > availableAllocations.length) {
         // Make availableAllocations be large enough to contain all allocations made by this
         // allocator so that release() does not need to grow the availableAllocations array. See
@@ -183,5 +182,19 @@ public final class DefaultAllocator implements Allocator {
   @Override
   public int getIndividualAllocationLength() {
     return individualAllocationSize;
+  }
+
+  private static java.nio.ByteBuffer createUntrackedBuffer(int size) {
+    if (android.os.Build.VERSION.SDK_INT >= 27) {
+      try {
+        android.os.SharedMemory sharedMemory = android.os.SharedMemory.create("ExoBuffer", size);
+        java.nio.ByteBuffer buffer = sharedMemory.mapReadWrite();
+        sharedMemory.close();
+        return buffer;
+      } catch (Exception e) {
+        // Fallback
+      }
+    }
+    return java.nio.ByteBuffer.allocateDirect(size);
   }
 }
