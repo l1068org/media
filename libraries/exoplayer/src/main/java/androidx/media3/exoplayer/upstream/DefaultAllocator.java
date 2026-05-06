@@ -195,6 +195,22 @@ public final class DefaultAllocator implements Allocator {
         // Fallback
       }
     }
+
+    // API < 27 Fallback: Untracked Memory Mapped File (mmap)
+    try {
+      java.io.File tempFile = java.io.File.createTempFile("exo_buf_", ".tmp");
+      try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(tempFile, "rw")) {
+        raf.setLength(size);
+        java.nio.MappedByteBuffer buffer = raf.getChannel().map(java.nio.channels.FileChannel.MapMode.READ_WRITE, 0, size);
+        return buffer;
+      } finally {
+        // Unlink the file immediately. The OS will keep the anonymous memory mapping alive.
+        tempFile.delete(); 
+      }
+    } catch (Exception e) {
+      // Last resort fallback
+    }
+
     return java.nio.ByteBuffer.allocateDirect(size);
   }
 }
