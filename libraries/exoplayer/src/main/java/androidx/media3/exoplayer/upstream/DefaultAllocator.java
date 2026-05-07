@@ -170,6 +170,12 @@ public final class DefaultAllocator implements Allocator {
     }
 
     // Discard allocations beyond the target.
+    for (int i = targetAvailableCount; i < availableCount; i++) {
+      Allocation allocation = availableAllocations[i];
+      if (allocation != null && allocation.buffer != null) {
+        freeUntrackedBuffer(allocation.buffer);
+      }
+    }
     Arrays.fill(availableAllocations, targetAvailableCount, availableCount, null);
     availableCount = targetAvailableCount;
   }
@@ -177,6 +183,14 @@ public final class DefaultAllocator implements Allocator {
   @Override
   public synchronized int getTotalBytesAllocated() {
     return allocatedCount * individualAllocationSize;
+  }
+
+  public synchronized int getAvailableBytes() {
+    return availableCount * individualAllocationSize;
+  }
+
+  public synchronized int getMemoryFootprint() {
+    return (allocatedCount + availableCount) * individualAllocationSize;
   }
 
   @Override
@@ -212,5 +226,29 @@ public final class DefaultAllocator implements Allocator {
     }
 
     return java.nio.ByteBuffer.allocateDirect(size);
+  }
+  private static void freeUntrackedBuffer(java.nio.ByteBuffer buffer) {
+    if (android.os.Build.VERSION.SDK_INT >= 27) {
+      try {
+        android.os.SharedMemory.unmap(buffer);
+        return;
+      } catch (Exception e) {
+        // Fallback
+      }
+    }
+
+    // API < 27 Fallback: Try to invoke the cleaner via reflection
+    try {
+      java.lang.reflect.Method cleanerMethod = buffer.getClass().getMethod("cleaner");
+      cleanerMethod.setAccessible(true);
+      Object cleaner = cleanerMethod.invoke(buffer);
+      if (cleaner != null) {
+        java.lang.reflect.Method cleanMethod = cleaner.getClass().getMethod("clean");
+        cleanMethod.setAccessible(true);
+        cleanMethod.invoke(cleaner);
+      }
+    } catch (Exception e) {
+      // Ignore
+    }
   }
 }
