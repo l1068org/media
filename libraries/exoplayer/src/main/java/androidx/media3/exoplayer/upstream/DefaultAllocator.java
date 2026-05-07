@@ -23,12 +23,76 @@ import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 
 /** Default implementation of {@link Allocator}. */
 @UnstableApi
 public final class DefaultAllocator implements Allocator {
 
   private static final int AVAILABLE_EXTRA_CAPACITY = 100;
+
+ // Tracks buffers created via mmap (FileChannel.map, Os.mmap, SharedMemory) so we only
+ // munmap those, not buffers from allocateDirect() which use malloc internally.
+ private static final Set<java.nio.ByteBuffer> mmapTrackedBuffers =
+     Collections.synchronizedSet(Collections.newSetFromMap(new IdentityHashMap<>()));
+
+ // Cached reflection fields — looked up once, reused on every buffer creation/free.
+ // This eliminates the expensive getDeclaredField + setAccessible overhead per call.
+ private static final class ReflectionCache {
+   static final java.lang.reflect.Field bufferAddress;
+   static final java.lang.reflect.Field bufferCapacity;
+   static final java.lang.reflect.Field bufferBlock; // ojluni MemoryBlock, may be null
+   static final java.lang.reflect.Field effectiveDirectAddress; // luni int, may be null
+   static final java.lang.reflect.Method madviseMethod; // Os.madvise, may be null (API 23+)
+   static final boolean isOjluni; // true if Buffer.address is long (API 24+)
+
+   static {
+     java.lang.reflect.Field addr = null;
+     java.lang.reflect.Field cap = null;
+     java.lang.reflect.Field blk = null;
+     java.lang.reflect.Field eda = null;
+     java.lang.reflect.Method madvise = null;
+     boolean ojluni = false;
+     try {
+       addr = java.nio.Buffer.class.getDeclaredField("address");
+       addr.setAccessible(true);
+       ojluni = (addr.getType() == long.class);
+     } catch (Exception e) {
+       // address field not found
+     }
+     try {
+       cap = java.nio.Buffer.class.getDeclaredField("capacity");
+       cap.setAccessible(true);
+     } catch (Exception e) {
+       // capacity field not found
+     }
+     try {
+       blk = java.nio.Buffer.class.getDeclaredField("block");
+       blk.setAccessible(true);
+     } catch (Exception e) {
+       // block field not found (luni or different ART version)
+     }
+     try {
+       eda = java.nio.Buffer.class.getDeclaredField("effectiveDirectAddress");
+       eda.setAccessible(true);
+     } catch (Exception e) {
+       // effectiveDirectAddress field not found
+     }
+     try {
+       madvise = android.system.Os.class.getMethod("madvise", long.class, long.class, int.class);
+     } catch (Exception e) {
+       // Os.madvise not available (pre-API 23)
+     }
+     bufferAddress = addr;
+     bufferCapacity = cap;
+     bufferBlock = blk;
+     effectiveDirectAddress = eda;
+     madviseMethod = madvise;
+     isOjluni = ojluni;
+   }
+ }
 
   private final boolean trimOnReset;
   private final int individualAllocationSize;
@@ -199,14 +263,63 @@ public final class DefaultAllocator implements Allocator {
   }
 
   private static java.nio.ByteBuffer createUntrackedBuffer(int size) {
+    // API 27+: Direct anonymous mmap — single syscall, no fd overhead, page-aligned.
+    // Faster than SharedMemory (ashmem fd → map → close = 3 syscalls).
     if (android.os.Build.VERSION.SDK_INT >= 27) {
       try {
-        android.os.SharedMemory sharedMemory = android.os.SharedMemory.create("ExoBuffer", size);
+        long address = android.system.Os.mmap(
+            0, size,
+            android.system.OsConstants.PROT_READ | android.system.OsConstants.PROT_WRITE,
+            android.system.OsConstants.MAP_PRIVATE | android.system.OsConstants.MAP_ANONYMOUS,
+            null, 0);
+        // Hint to kernel: sequential access → aggressive readahead, reduced page fault latency.
+        // Os.madvise is only available from API 23+, so use reflection for compatibility.
+        try {
+          if (android.os.Build.VERSION.SDK_INT >= 23) {
+            madvise(address, size, 2 /* MADV_SEQUENTIAL */);
+          }
+        } catch (Exception ignored) {
+          // madvise is optional
+        }
+        // Wrap the mmap'd native memory in a DirectByteBuffer via reflection.
+        // This avoids the SharedMemory fd overhead while keeping ByteBuffer API compatibility.
+        java.nio.ByteBuffer buffer = newDirectByteBuffer(address, size);
+        if (buffer != null) {
+          mmapTrackedBuffers.add(buffer);
+          return buffer;
+        }
+        // newDirectByteBuffer failed, munmap and fall through
+        try { android.system.Os.munmap(address, size); } catch (Exception ignored) {}
+      } catch (Exception e) {
+        // Direct mmap failed, fall through to SharedMemory
+      }
+
+      // SharedMemory fallback for API 27+
+      android.os.SharedMemory sharedMemory = null;
+      try {
+        sharedMemory = android.os.SharedMemory.create(null, size);
         java.nio.ByteBuffer buffer = sharedMemory.mapReadWrite();
-        sharedMemory.close();
+        // Apply sequential access hint to SharedMemory-backed mapping too.
+        try {
+          if (android.os.Build.VERSION.SDK_INT >= 23) {
+            long addr = getNativeAddress(buffer);
+            if (addr != 0) {
+              madvise(addr, size, 2 /* MADV_SEQUENTIAL */);
+            }
+          }
+        } catch (Exception ignored) {
+        }
+        mmapTrackedBuffers.add(buffer);
         return buffer;
       } catch (Exception e) {
-        // Fallback
+        // SharedMemory creation or mapping failed, fall through
+      } finally {
+        if (sharedMemory != null) {
+          try {
+            sharedMemory.close();
+          } catch (Exception ignored) {
+          }
+        }
       }
     }
 
@@ -216,10 +329,11 @@ public final class DefaultAllocator implements Allocator {
       try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(tempFile, "rw")) {
         raf.setLength(size);
         java.nio.MappedByteBuffer buffer = raf.getChannel().map(java.nio.channels.FileChannel.MapMode.READ_WRITE, 0, size);
+        mmapTrackedBuffers.add(buffer);
         return buffer;
       } finally {
         // Unlink the file immediately. The OS will keep the anonymous memory mapping alive.
-        tempFile.delete(); 
+        tempFile.delete();
       }
     } catch (Exception e) {
       // Last resort fallback
@@ -228,27 +342,95 @@ public final class DefaultAllocator implements Allocator {
     return java.nio.ByteBuffer.allocateDirect(size);
   }
   private static void freeUntrackedBuffer(java.nio.ByteBuffer buffer) {
-    if (android.os.Build.VERSION.SDK_INT >= 27) {
-      try {
-        android.os.SharedMemory.unmap(buffer);
-        return;
-      } catch (Exception e) {
-        // Fallback
+    // All mmap'd buffers (anonymous, SharedMemory, FileChannel) are tracked in mmapTrackedBuffers.
+    // Only munmap those — allocateDirect() uses malloc internally, munmap on malloc'd memory = crash.
+    if (mmapTrackedBuffers.remove(buffer)) {
+      long address = getNativeAddress(buffer);
+      if (address != 0) {
+        try {
+          android.system.Os.munmap(address, buffer.capacity());
+        } catch (Exception e) {
+          // munmap failed, GC will reclaim eventually
+        }
       }
+      return;
     }
 
-    // API < 27 Fallback: Try to invoke the cleaner via reflection
+    // allocateDirect() or munmap failed: let GC reclaim the native memory eventually.
+    // Android ART's DirectByteBuffer has no accessible cleaner, so explicit free is not possible.
+  }
+
+  /**
+   * Reads the native memory address from a direct ByteBuffer via reflection.
+   *
+   * <p>Android has two NIO implementations:
+   *
+   * <ul>
+   *   <li>API 24+ (ojluni/OpenJDK): {@code java.nio.Buffer.address} is {@code long}
+   *   <li>API 21-23 (luni/Harmony): {@code java.nio.Buffer.effectiveDirectAddress} is {@code int}
+   * </ul>
+   *
+   * <p>On 64-bit devices running API 21-23, the int field cannot hold a full 64-bit address and
+   * may be truncated. In that case, this method returns 0 and the caller should fall back to GC.
+   */
+  private static long getNativeAddress(java.nio.ByteBuffer buffer) {
+    // Use cached fields — no per-call reflection lookup
     try {
-      java.lang.reflect.Method cleanerMethod = buffer.getClass().getMethod("cleaner");
-      cleanerMethod.setAccessible(true);
-      Object cleaner = cleanerMethod.invoke(buffer);
-      if (cleaner != null) {
-        java.lang.reflect.Method cleanMethod = cleaner.getClass().getMethod("clean");
-        cleanMethod.setAccessible(true);
-        cleanMethod.invoke(cleaner);
+      if (ReflectionCache.isOjluni && ReflectionCache.bufferAddress != null) {
+        return ReflectionCache.bufferAddress.getLong(buffer);
       }
     } catch (Exception e) {
-      // Ignore
+      return 0;
+    }
+    // luni fallback: effectiveDirectAddress is int
+    try {
+      if (ReflectionCache.effectiveDirectAddress != null) {
+        return ReflectionCache.effectiveDirectAddress.getInt(buffer);
+      }
+    } catch (Exception e) {
+      return 0;
+    }
+    return 0;
+  }
+
+  /**
+   * Calls {@code android.system.Os.madvise()} via reflection.
+   *
+   * <p>{@code Os.madvise()} was added in API 23 but is not available at compile time when
+   * building with a lower minSdk. This method uses reflection to call it safely.
+   *
+   * @param address The start address of the memory region.
+   * @param size The size of the region in bytes.
+   * @param advice The advice flag (e.g. 2 for MADV_SEQUENTIAL).
+   */
+  private static void madvise(long address, long size, int advice) throws Exception {
+    if (ReflectionCache.madviseMethod != null) {
+      ReflectionCache.madviseMethod.invoke(null, address, size, advice);
+    }
+  }
+
+  @androidx.annotation.Nullable
+  private static java.nio.ByteBuffer newDirectByteBuffer(long address, int size) {
+    // Only supported on ojluni (API 24+) where Buffer.address is long
+    if (!ReflectionCache.isOjluni || ReflectionCache.bufferAddress == null
+        || ReflectionCache.bufferCapacity == null) {
+      return null;
+    }
+    try {
+      // Allocate a small DirectByteBuffer as a template (will be patched)
+      java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocateDirect(1);
+      // Patch: replace native address with our mmap'd address
+      ReflectionCache.bufferAddress.setLong(buffer, address);
+      // Patch: replace capacity and limit
+      ReflectionCache.bufferCapacity.setInt(buffer, size);
+      buffer.limit(size);
+      // Patch: clear the MemoryBlock reference so GC doesn't double-free our mmap'd memory
+      if (ReflectionCache.bufferBlock != null) {
+        ReflectionCache.bufferBlock.set(buffer, null);
+      }
+      return buffer;
+    } catch (Exception e) {
+      return null;
     }
   }
 }
