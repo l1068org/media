@@ -305,12 +305,9 @@ import java.lang.reflect.Method;
 
     int audioTrackPlayState = audioTrack.getPlayState();
     if (audioTrackPlayState == PLAYSTATE_PLAYING) {
-      if (useGetTimestampMode
-          || !audioTimestampPoller.isWaitingForAdvancingTimestamp()
-          || positionUs > onPositionAdvancingFromPositionUs) {
+      if (useGetTimestampMode || !audioTimestampPoller.isWaitingForAdvancingTimestamp()) {
         // Assume the new position is reliable to estimate the playout start time once we have an
-        // advancing timestamp from the AudioTimestampPoller, we stopped waiting for it, or the raw
-        // playback head position is advancing even if the timestamp poller is still initializing.
+        // advancing timestamp from the AudioTimestampPoller, or we stopped waiting for it.
         maybeTriggerOnPositionAdvancingCallback(positionUs);
       }
 
@@ -524,20 +521,22 @@ import java.lang.reflect.Method;
     long systemTimeUs = clock.nanoTime() / 1000;
     if (systemTimeUs - lastPlayheadSampleTimeUs >= MIN_PLAYHEAD_OFFSET_SAMPLE_INTERVAL_US) {
       long playbackPositionUs = getPlaybackHeadPositionUs();
-      if (playbackPositionUs > 0) {
-        // Take a new sample and update the smoothed offset between the system clock and the playhead.
-        playheadOffsets[nextPlayheadOffsetIndex] =
-            Util.getPlayoutDurationForMediaDuration(playbackPositionUs, audioTrackPlaybackSpeed)
-                - systemTimeUs;
-        nextPlayheadOffsetIndex = (nextPlayheadOffsetIndex + 1) % MAX_PLAYHEAD_OFFSET_COUNT;
-        if (playheadOffsetCount < MAX_PLAYHEAD_OFFSET_COUNT) {
-          playheadOffsetCount++;
-        }
-        lastPlayheadSampleTimeUs = systemTimeUs;
-        smoothedPlayheadOffsetUs = 0;
-        for (int i = 0; i < playheadOffsetCount; i++) {
-          smoothedPlayheadOffsetUs += playheadOffsets[i] / playheadOffsetCount;
-        }
+      if (playbackPositionUs == 0) {
+        // The AudioTrack hasn't output anything yet.
+        return;
+      }
+      // Take a new sample and update the smoothed offset between the system clock and the playhead.
+      playheadOffsets[nextPlayheadOffsetIndex] =
+          Util.getPlayoutDurationForMediaDuration(playbackPositionUs, audioTrackPlaybackSpeed)
+              - systemTimeUs;
+      nextPlayheadOffsetIndex = (nextPlayheadOffsetIndex + 1) % MAX_PLAYHEAD_OFFSET_COUNT;
+      if (playheadOffsetCount < MAX_PLAYHEAD_OFFSET_COUNT) {
+        playheadOffsetCount++;
+      }
+      lastPlayheadSampleTimeUs = systemTimeUs;
+      smoothedPlayheadOffsetUs = 0;
+      for (int i = 0; i < playheadOffsetCount; i++) {
+        smoothedPlayheadOffsetUs += playheadOffsets[i] / playheadOffsetCount;
       }
     }
 
