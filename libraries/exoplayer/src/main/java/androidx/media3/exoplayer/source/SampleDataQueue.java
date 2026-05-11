@@ -183,10 +183,12 @@ import java.util.Arrays;
       }
       bytesAppended = input.read(jniScratch, 0, length);
       if (bytesAppended > 0) {
-        synchronized (allocation.buffer) {
-          allocation.buffer.position(writeAllocationNode.translateOffset(totalBytesWritten));
-          allocation.buffer.put(jniScratch, 0, bytesAppended);
-        }
+        writeData(
+            allocation.buffer,
+            writeAllocationNode.translateOffset(totalBytesWritten),
+            jniScratch,
+            0,
+            bytesAppended);
       }
     } else {
       bytesAppended =
@@ -210,10 +212,12 @@ import java.util.Arrays;
       int bytesAppended = preAppend(length);
       Allocation allocation = writeAllocationNode.allocation;
       if (allocation.buffer != null) {
-        synchronized (allocation.buffer) {
-          allocation.buffer.position(writeAllocationNode.translateOffset(totalBytesWritten));
-          allocation.buffer.put(buffer.getData(), buffer.getPosition(), bytesAppended);
-        }
+        writeData(
+            allocation.buffer,
+            writeAllocationNode.translateOffset(totalBytesWritten),
+            buffer.getData(),
+            buffer.getPosition(),
+            bytesAppended);
         buffer.skipBytes(bytesAppended);
       } else {
         buffer.readBytes(
@@ -431,12 +435,12 @@ import java.util.Arrays;
       int toCopy = min(remaining, (int) (allocationNode.endPosition - absolutePosition));
       Allocation allocation = allocationNode.allocation;
       if (allocation.buffer != null) {
-        synchronized (allocation.buffer) {
-          allocation.buffer.position(allocationNode.translateOffset(absolutePosition));
-          allocation.buffer.limit(allocation.buffer.position() + toCopy);
-          target.put(allocation.buffer);
-          // Restore limit just in case
-          allocation.buffer.limit(allocation.buffer.capacity());
+        int sourceOffset = allocationNode.translateOffset(absolutePosition);
+        if (!readData(allocation.buffer, sourceOffset, target, toCopy)) {
+          ByteBuffer source = allocation.buffer.duplicate();
+          source.position(sourceOffset);
+          source.limit(sourceOffset + toCopy);
+          target.put(source);
         }
       } else {
         target.put(allocation.data, allocationNode.translateOffset(absolutePosition), toCopy);
@@ -467,9 +471,13 @@ import java.util.Arrays;
       int toCopy = min(remaining, (int) (allocationNode.endPosition - absolutePosition));
       Allocation allocation = allocationNode.allocation;
       if (allocation.buffer != null) {
-        synchronized (allocation.buffer) {
-          allocation.buffer.position(allocationNode.translateOffset(absolutePosition));
-          allocation.buffer.get(target, length - remaining, toCopy);
+        int sourceOffset = allocationNode.translateOffset(absolutePosition);
+        int targetOffset = length - remaining;
+        if (!SampleDataQueueNative.copyToArray(
+            allocation.buffer, sourceOffset, target, targetOffset, toCopy)) {
+          ByteBuffer source = allocation.buffer.duplicate();
+          source.position(sourceOffset);
+          source.get(target, targetOffset, toCopy);
         }
       } else {
         System.arraycopy(
@@ -486,6 +494,34 @@ import java.util.Arrays;
       }
     }
     return allocationNode;
+  }
+
+  private static void writeData(
+      ByteBuffer target, int targetOffset, byte[] source, int sourceOffset, int length) {
+    if (!SampleDataQueueNative.copyFromArray(source, sourceOffset, target, targetOffset, length)) {
+      ByteBuffer targetDuplicate = target.duplicate();
+      targetDuplicate.position(targetOffset);
+      targetDuplicate.put(source, sourceOffset, length);
+    }
+  }
+
+  private static boolean readData(
+      ByteBuffer source, int sourceOffset, ByteBuffer target, int length) {
+    int targetOffset = target.position();
+    if (target.isDirect()
+        && SampleDataQueueNative.copyBetweenDirectBuffers(
+            source, sourceOffset, target, targetOffset, length)) {
+      target.position(targetOffset + length);
+      return true;
+    }
+    if (target.hasArray()
+        && target.remaining() >= length
+        && SampleDataQueueNative.copyToArray(
+            source, sourceOffset, target.array(), target.arrayOffset() + targetOffset, length)) {
+      target.position(targetOffset + length);
+      return true;
+    }
+    return false;
   }
 
   /**

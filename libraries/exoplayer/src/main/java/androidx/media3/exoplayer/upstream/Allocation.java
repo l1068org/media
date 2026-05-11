@@ -41,6 +41,8 @@ public final class Allocation {
   /** The offset of the allocated space in {@link #data}. */
   public final int offset;
 
+  long nativeHandle;
+
   /**
    * @param data The array containing the allocated space.
    * @param offset The offset of the allocated space in {@code data}.
@@ -49,6 +51,7 @@ public final class Allocation {
     this.data = data;
     this.buffer = null;
     this.offset = offset;
+    this.nativeHandle = 0;
   }
 
   /**
@@ -59,5 +62,13 @@ public final class Allocation {
     this.data = null;
     this.buffer = buffer;
     this.offset = offset;
+    this.nativeHandle = 0;
+  }
+
+  Allocation(@Nullable java.nio.ByteBuffer buffer, int offset, long nativeHandle) {
+    this.data = null;
+    this.buffer = buffer;
+    this.offset = offset;
+    this.nativeHandle = nativeHandle;
   }
 }
