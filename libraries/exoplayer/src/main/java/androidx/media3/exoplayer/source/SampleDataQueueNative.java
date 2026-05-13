@@ -6,8 +6,8 @@ final class SampleDataQueueNative {
 
   private static final String LIBRARY_NAME = "media3_exoplayer_jni";
 
-  private static boolean loadAttempted;
-  private static boolean isAvailable;
+  private static volatile boolean loadAttempted;
+  private static volatile boolean isAvailable;
 
   public static boolean copyFromArray(
       byte[] source, int sourceOffset, ByteBuffer target, int targetOffset, int length) {
@@ -57,7 +57,14 @@ final class SampleDataQueueNative {
     }
   }
 
-  private static synchronized boolean isAvailable() {
+  private static boolean isAvailable() {
+    if (loadAttempted) {
+      return isAvailable;
+    }
+    return loadLibrary();
+  }
+
+  private static synchronized boolean loadLibrary() {
     if (loadAttempted) {
       return isAvailable;
     }

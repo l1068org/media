@@ -18,6 +18,7 @@ package androidx.media3.exoplayer.source;
 import static java.lang.Math.min;
 
 import androidx.annotation.Nullable;
+import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
 import androidx.media3.common.DataReader;
 import androidx.media3.common.util.Assertions;
@@ -39,6 +40,7 @@ import java.util.Arrays;
 /* package */ class SampleDataQueue {
 
   private static final int INITIAL_SCRATCH_SIZE = 32;
+  private static final int MAX_JAVA_SMALL_COPY_LENGTH = 32;
 
   private final Allocator allocator;
   private final int allocationLength;
@@ -178,17 +180,21 @@ import java.util.Arrays;
     int bytesAppended;
     Allocation allocation = writeAllocationNode.allocation;
     if (allocation.buffer != null) {
-      if (jniScratch == null || jniScratch.length < length) {
-        jniScratch = new byte[length];
-      }
-      bytesAppended = input.read(jniScratch, 0, length);
-      if (bytesAppended > 0) {
-        writeData(
-            allocation.buffer,
-            writeAllocationNode.translateOffset(totalBytesWritten),
-            jniScratch,
-            0,
-            bytesAppended);
+      int targetOffset = writeAllocationNode.translateOffset(totalBytesWritten);
+      if (input instanceof ByteBufferDataReader
+          && ((ByteBufferDataReader) input).supportsByteBufferRead()) {
+        ByteBuffer target = allocation.buffer.duplicate();
+        target.position(targetOffset);
+        target.limit(targetOffset + length);
+        bytesAppended = ((ByteBufferDataReader) input).read(target, length);
+      } else {
+        if (jniScratch == null || jniScratch.length < length) {
+          jniScratch = new byte[length];
+        }
+        bytesAppended = input.read(jniScratch, 0, length);
+        if (bytesAppended > 0) {
+          writeData(allocation.buffer, targetOffset, jniScratch, 0, bytesAppended);
+        }
       }
     } else {
       bytesAppended =
@@ -498,6 +504,12 @@ import java.util.Arrays;
 
   private static void writeData(
       ByteBuffer target, int targetOffset, byte[] source, int sourceOffset, int length) {
+    if (length <= MAX_JAVA_SMALL_COPY_LENGTH) {
+      for (int i = 0; i < length; i++) {
+        target.put(targetOffset + i, source[sourceOffset + i]);
+      }
+      return;
+    }
     if (!SampleDataQueueNative.copyFromArray(source, sourceOffset, target, targetOffset, length)) {
       ByteBuffer targetDuplicate = target.duplicate();
       targetDuplicate.position(targetOffset);
@@ -508,6 +520,15 @@ import java.util.Arrays;
   private static boolean readData(
       ByteBuffer source, int sourceOffset, ByteBuffer target, int length) {
     int targetOffset = target.position();
+    if (length <= MAX_JAVA_SMALL_COPY_LENGTH) {
+      if (target.remaining() < length) {
+        return false;
+      }
+      for (int i = 0; i < length; i++) {
+        target.put(source.get(sourceOffset + i));
+      }
+      return true;
+    }
     if (target.isDirect()
         && SampleDataQueueNative.copyBetweenDirectBuffers(
             source, sourceOffset, target, targetOffset, length)) {

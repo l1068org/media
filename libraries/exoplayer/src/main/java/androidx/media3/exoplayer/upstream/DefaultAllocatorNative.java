@@ -6,8 +6,8 @@ final class DefaultAllocatorNative {
 
   private static final String LIBRARY_NAME = "media3_exoplayer_jni";
 
-  private static boolean loadAttempted;
-  private static boolean isAvailable;
+  private static volatile boolean loadAttempted;
+  private static volatile boolean isAvailable;
 
   @Nullable
   public static Allocation createAllocation(int size) {
@@ -35,7 +35,14 @@ final class DefaultAllocatorNative {
     }
   }
 
-  private static synchronized boolean isAvailable() {
+  private static boolean isAvailable() {
+    if (loadAttempted) {
+      return isAvailable;
+    }
+    return loadLibrary();
+  }
+
+  private static synchronized boolean loadLibrary() {
     if (loadAttempted) {
       return isAvailable;
     }

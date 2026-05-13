@@ -27,6 +27,7 @@ import android.content.res.Resources;
 import android.net.Uri;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
+import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.util.Assertions;
@@ -35,6 +36,7 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.List;
 
@@ -69,7 +71,7 @@ import java.util.List;
  * }</pre>
  */
 @UnstableApi
-public final class RawResourceDataSource extends BaseDataSource {
+public final class RawResourceDataSource extends BaseDataSource implements ByteBufferDataReader {
 
   /** Thrown when an {@link IOException} is encountered reading from a raw resource. */
   public static class RawResourceDataSourceException extends DataSourceException {
@@ -329,6 +331,45 @@ public final class RawResourceDataSource extends BaseDataSource {
             new EOFException(),
             PlaybackException.ERROR_CODE_IO_UNSPECIFIED);
       }
+      return C.RESULT_END_OF_INPUT;
+    }
+    if (bytesRemaining != C.LENGTH_UNSET) {
+      bytesRemaining -= bytesRead;
+    }
+    bytesTransferred(bytesRead);
+    return bytesRead;
+  }
+
+  @Override
+  public boolean supportsByteBufferRead() {
+    return inputStream instanceof FileInputStream;
+  }
+
+  @Override
+  public int read(ByteBuffer buffer, int length) throws RawResourceDataSourceException {
+    if (length == 0) {
+      return 0;
+    } else if (bytesRemaining == 0) {
+      return C.RESULT_END_OF_INPUT;
+    }
+
+    int originalLimit = buffer.limit();
+    int bytesRead;
+    try {
+      int bytesToRead =
+          bytesRemaining == C.LENGTH_UNSET
+              ? min(length, buffer.remaining())
+              : (int) min(bytesRemaining, min(length, buffer.remaining()));
+      buffer.limit(buffer.position() + bytesToRead);
+      bytesRead = ((FileInputStream) castNonNull(inputStream)).getChannel().read(buffer);
+    } catch (IOException e) {
+      throw new RawResourceDataSourceException(
+          /* message= */ null, e, PlaybackException.ERROR_CODE_IO_UNSPECIFIED);
+    } finally {
+      buffer.limit(originalLimit);
+    }
+
+    if (bytesRead == -1) {
       return C.RESULT_END_OF_INPUT;
     }
     if (bytesRemaining != C.LENGTH_UNSET) {
