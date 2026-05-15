@@ -45,6 +45,7 @@ import androidx.media3.container.Mp4Box.ContainerBox;
 import androidx.media3.container.NalUnitUtil;
 import androidx.media3.extractor.Ac3Util;
 import androidx.media3.extractor.Ac4Util;
+import androidx.media3.extractor.DtsUtil;
 import androidx.media3.extractor.Extractor;
 import androidx.media3.extractor.ExtractorInput;
 import androidx.media3.extractor.ExtractorOutput;
@@ -718,7 +719,9 @@ public final class Mp4Extractor implements Extractor {
           mvhdMetadata,
           thumbnailMetadata);
       formatBuilder.setContainerMimeType(containerMimeType);
-      if (Objects.equals(track.format.sampleMimeType, MimeTypes.AUDIO_MPEG)) {
+      if (Objects.equals(track.format.sampleMimeType, MimeTypes.AUDIO_MPEG)
+          || Objects.equals(track.format.sampleMimeType, MimeTypes.AUDIO_DTS)
+          || Objects.equals(track.format.sampleMimeType, MimeTypes.AUDIO_DTS_HD)) {
         // The moov and esds boxes don't contain enough information to distinguish between MPEG
         // audio layers 1, 2 and 3, but the distinction is important to select the right MIME type
         // for MediaCodec decoders (and other decoders that handle the same audio/mpeg-L1 and
@@ -979,6 +982,12 @@ public final class Mp4Extractor implements Extractor {
                     .setSampleMimeType(checkNotNull(mpegHeader.mimeType))
                     .build()
                 : pendingFormat);
+        track.pendingFormat = null;
+      } else if (track.pendingFormat != null
+          && (Objects.equals(track.track.format.sampleMimeType, MimeTypes.AUDIO_DTS)
+              || Objects.equals(track.track.format.sampleMimeType, MimeTypes.AUDIO_DTS_HD))) {
+        track.trackOutput.format(
+            DtsUtil.updateFormatWithDtsHdInfo(input, sampleSize, track.pendingFormat));
         track.pendingFormat = null;
       } else if (trueHdSampleRechunker != null) {
         trueHdSampleRechunker.startSample(input);
