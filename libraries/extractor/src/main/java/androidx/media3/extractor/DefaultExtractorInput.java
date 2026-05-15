@@ -21,6 +21,7 @@ import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
 import androidx.media3.common.DataReader;
 import androidx.media3.common.MediaLibraryInfo;
+import androidx.media3.common.NuvioEngineConfig;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -40,7 +41,7 @@ public final class DefaultExtractorInput implements ExtractorInput, ByteBufferDa
 
   private static final int PEEK_MIN_FREE_SPACE_AFTER_RESIZE = 64 * 1024;
   private static final int PEEK_MAX_FREE_SPACE = 512 * 1024;
-  private static final int SCRATCH_SPACE_SIZE = 65536;
+  private static final int SCRATCH_SPACE_SIZE = NuvioEngineConfig.get().getExtractorScratchSize();
 
   private final byte[] scratchSpace;
   private final DataReader dataReader;

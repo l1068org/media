@@ -18,6 +18,7 @@ package androidx.media3.exoplayer.upstream;
 import static java.lang.Math.max;
 
 import androidx.annotation.Nullable;
+import androidx.media3.common.NuvioEngineConfig;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
@@ -117,7 +118,7 @@ public final class DefaultAllocator implements Allocator {
   public synchronized void release(Allocation allocation) {
     availableAllocations[availableCount++] = allocation;
     allocatedCount--;
-    if (shouldTrim()) {
+    if (NuvioEngineConfig.get().isNativeAllocationEnabled() && shouldTrim()) {
       trim();
     }
     // Wake up threads waiting for the allocated size to drop.
@@ -131,7 +132,7 @@ public final class DefaultAllocator implements Allocator {
       allocatedCount--;
       allocationNode = allocationNode.next();
     }
-    if (shouldTrim()) {
+    if (NuvioEngineConfig.get().isNativeAllocationEnabled() && shouldTrim()) {
       trim();
     }
     // Wake up threads waiting for the allocated size to drop.
@@ -205,6 +206,9 @@ public final class DefaultAllocator implements Allocator {
   }
 
   private static Allocation createAllocation(int size) {
+    if (!NuvioEngineConfig.get().isNativeAllocationEnabled()) {
+      return new Allocation(new byte[size], 0);
+    }
     @Nullable Allocation allocation = DefaultAllocatorNative.createAllocation(size);
     return allocation != null
         ? allocation

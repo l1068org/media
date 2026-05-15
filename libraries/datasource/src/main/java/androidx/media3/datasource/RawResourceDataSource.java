@@ -29,6 +29,7 @@ import android.text.TextUtils;
 import androidx.annotation.Nullable;
 import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
+import androidx.media3.common.NuvioEngineConfig;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
@@ -342,7 +343,7 @@ public final class RawResourceDataSource extends BaseDataSource implements ByteB
 
   @Override
   public boolean supportsByteBufferRead() {
-    return inputStream instanceof FileInputStream;
+    return NuvioEngineConfig.get().isZeroCopyEnabled() && inputStream instanceof FileInputStream;
   }
 
   @Override

@@ -26,6 +26,7 @@ import android.system.OsConstants;
 import androidx.annotation.Nullable;
 import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
+import androidx.media3.common.NuvioEngineConfig;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.util.UnstableApi;
 import com.google.common.collect.Sets;
@@ -165,7 +166,7 @@ public class FileDescriptorDataSource extends BaseDataSource implements ByteBuff
 
   @Override
   public boolean supportsByteBufferRead() {
-    return true;
+    return NuvioEngineConfig.get().isZeroCopyEnabled();
   }
 
   @Override

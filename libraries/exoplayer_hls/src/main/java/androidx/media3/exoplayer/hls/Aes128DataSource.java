@@ -19,6 +19,7 @@ import android.net.Uri;
 import androidx.annotation.Nullable;
 import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
+import androidx.media3.common.NuvioEngineConfig;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSourceInputStream;
@@ -113,7 +114,7 @@ import javax.crypto.spec.SecretKeySpec;
 
   @Override
   public boolean supportsByteBufferRead() {
-    return true;
+    return NuvioEngineConfig.get().isZeroCopyEnabled();
   }
 
   @Override

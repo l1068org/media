@@ -33,6 +33,7 @@ import androidx.annotation.RequiresExtension;
 import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
+import androidx.media3.common.NuvioEngineConfig;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Clock;
@@ -620,7 +621,7 @@ public final class HttpEngineDataSource extends BaseDataSource
 
   @Override
   public boolean supportsByteBufferRead() {
-    return true;
+    return NuvioEngineConfig.get().isZeroCopyEnabled();
   }
 
   @Override

@@ -27,6 +27,7 @@ import android.provider.MediaStore;
 import androidx.annotation.Nullable;
 import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
+import androidx.media3.common.NuvioEngineConfig;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.util.UnstableApi;
 import java.io.FileInputStream;
@@ -198,7 +199,7 @@ public final class ContentDataSource extends BaseDataSource implements ByteBuffe
 
   @Override
   public boolean supportsByteBufferRead() {
-    return true;
+    return NuvioEngineConfig.get().isZeroCopyEnabled();
   }
 
   @Override

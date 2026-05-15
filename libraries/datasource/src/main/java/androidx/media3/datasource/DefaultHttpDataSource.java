@@ -25,6 +25,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.ByteBufferDataReader;
 import androidx.media3.common.C;
+import androidx.media3.common.NuvioEngineConfig;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
@@ -488,7 +489,7 @@ public class DefaultHttpDataSource extends BaseDataSource
 
   @Override
   public boolean supportsByteBufferRead() {
-    return true;
+    return NuvioEngineConfig.get().isZeroCopyEnabled();
   }
 
   @Override
