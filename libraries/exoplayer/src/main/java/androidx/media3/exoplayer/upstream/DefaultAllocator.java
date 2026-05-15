@@ -117,6 +117,9 @@ public final class DefaultAllocator implements Allocator {
   public synchronized void release(Allocation allocation) {
     availableAllocations[availableCount++] = allocation;
     allocatedCount--;
+    if (shouldTrim()) {
+      trim();
+    }
     // Wake up threads waiting for the allocated size to drop.
     notifyAll();
   }
@@ -127,6 +130,9 @@ public final class DefaultAllocator implements Allocator {
       availableAllocations[availableCount++] = allocationNode.getAllocation();
       allocatedCount--;
       allocationNode = allocationNode.next();
+    }
+    if (shouldTrim()) {
+      trim();
     }
     // Wake up threads waiting for the allocated size to drop.
     notifyAll();
@@ -209,6 +215,12 @@ public final class DefaultAllocator implements Allocator {
     if (allocation.nativeHandle != 0) {
       DefaultAllocatorNative.freeAllocation(allocation);
     }
+  }
+
+  private boolean shouldTrim() {
+    int targetAllocationCount = Util.ceilDivide(targetBufferSize, individualAllocationSize);
+    int targetAvailableCount = max(0, targetAllocationCount - allocatedCount);
+    return availableCount > targetAvailableCount;
   }
 
 }

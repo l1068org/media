@@ -24,7 +24,7 @@ final class DefaultAllocatorNative {
 
   public static void freeAllocation(Allocation allocation) {
     long nativeHandle = allocation.nativeHandle;
-    if (nativeHandle == 0 || !isAvailable()) {
+    if (nativeHandle == 0) {
       return;
     }
     try {
