@@ -40,7 +40,7 @@ public final class DefaultExtractorInput implements ExtractorInput, ByteBufferDa
 
   private static final int PEEK_MIN_FREE_SPACE_AFTER_RESIZE = 64 * 1024;
   private static final int PEEK_MAX_FREE_SPACE = 512 * 1024;
-  private static final int SCRATCH_SPACE_SIZE = 4096;
+  private static final int SCRATCH_SPACE_SIZE = 65536;
 
   private final byte[] scratchSpace;
   private final DataReader dataReader;
