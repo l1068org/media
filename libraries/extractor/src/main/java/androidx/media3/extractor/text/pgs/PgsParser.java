@@ -29,6 +29,7 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.extractor.text.CuesWithTiming;
 import androidx.media3.extractor.text.SubtitleParser;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.zip.Inflater;
@@ -48,6 +49,7 @@ public final class PgsParser implements SubtitleParser {
   private static final int SECTION_TYPE_BITMAP_PICTURE = 0x15;
   private static final int SECTION_TYPE_IDENTIFIER = 0x16;
   private static final int SECTION_TYPE_END = 0x80;
+  private static final int COMPOSITION_STATE_EPOCH_START = 0x80;
 
   private final ParsableByteArray buffer;
   private final ParsableByteArray inflatedBuffer;
@@ -82,76 +84,87 @@ public final class PgsParser implements SubtitleParser {
     }
     cueBuilder.reset();
     ArrayList<Cue> cues = new ArrayList<>();
+    boolean sawPcs = false;
+    boolean sawEnd = false;
     while (buffer.bytesLeft() >= 3) {
-      Cue cue = readNextSection(buffer, cueBuilder);
-      if (cue != null) {
-        cues.add(cue);
+      int limit = buffer.limit();
+      int sectionType = buffer.readUnsignedByte();
+      int sectionLength = buffer.readUnsignedShort();
+      int nextSectionPosition = buffer.getPosition() + sectionLength;
+      if (nextSectionPosition > limit) {
+        buffer.setPosition(limit);
+        break;
       }
+      switch (sectionType) {
+        case SECTION_TYPE_PALETTE:
+          cueBuilder.parsePaletteSection(buffer, sectionLength);
+          break;
+        case SECTION_TYPE_BITMAP_PICTURE:
+          cueBuilder.parseBitmapSection(buffer, sectionLength);
+          if (cueBuilder.isBitmapComplete()) {
+            Cue bitmapCue = cueBuilder.build();
+            if (bitmapCue != null) {
+              cues.add(bitmapCue);
+            }
+            cueBuilder.resetBitmapOnly();
+          }
+          break;
+        case SECTION_TYPE_IDENTIFIER:
+          cueBuilder.parseIdentifierSection(buffer, sectionLength);
+          sawPcs = true;
+          break;
+        case SECTION_TYPE_END:
+          Cue cue = cueBuilder.build();
+          if (cue != null) {
+            cues.add(cue);
+          }
+          cueBuilder.reset();
+          sawEnd = true;
+          break;
+      }
+      buffer.setPosition(nextSectionPosition);
     }
-    output.accept(
-        new CuesWithTiming(cues, /* startTimeUs= */ C.TIME_UNSET, /* durationUs= */ C.TIME_UNSET));
-  }
-
-  @Nullable
-  private static Cue readNextSection(ParsableByteArray buffer, CueBuilder cueBuilder) {
-    int limit = buffer.limit();
-    int sectionType = buffer.readUnsignedByte();
-    int sectionLength = buffer.readUnsignedShort();
-
-    int nextSectionPosition = buffer.getPosition() + sectionLength;
-    if (nextSectionPosition > limit) {
-      buffer.setPosition(limit);
-      return null;
+    if (!cues.isEmpty()) {
+      output.accept(
+          new CuesWithTiming(cues, /* startTimeUs= */ C.TIME_UNSET, /* durationUs= */ C.TIME_UNSET));
+    } else if (sawPcs && sawEnd) {
+      output.accept(
+          new CuesWithTiming(
+              ImmutableList.of(), /* startTimeUs= */ C.TIME_UNSET, /* durationUs= */ C.TIME_UNSET));
     }
-
-    Cue cue = null;
-    switch (sectionType) {
-      case SECTION_TYPE_PALETTE:
-        cueBuilder.parsePaletteSection(buffer, sectionLength);
-        break;
-      case SECTION_TYPE_BITMAP_PICTURE:
-        cueBuilder.parseBitmapSection(buffer, sectionLength);
-        break;
-      case SECTION_TYPE_IDENTIFIER:
-        cueBuilder.parseIdentifierSection(buffer, sectionLength);
-        break;
-      case SECTION_TYPE_END:
-        cue = cueBuilder.build();
-        cueBuilder.reset();
-        break;
-      default:
-        break;
-    }
-
-    buffer.setPosition(nextSectionPosition);
-    return cue;
   }
 
   private static final class CueBuilder {
 
+    private static final int MAX_COMPOSITION_OBJECTS = 32;
+
     private final ParsableByteArray bitmapData;
     private final int[] colors;
+    private int[] argbBitmapData;
 
     private boolean colorsSet;
+    private boolean hasBitmapDataForCurrentObject;
     private int planeWidth;
     private int planeHeight;
-    private int bitmapX;
-    private int bitmapY;
     private int bitmapWidth;
     private int bitmapHeight;
+
+    private final int[] compositionObjectX = new int[MAX_COMPOSITION_OBJECTS];
+    private final int[] compositionObjectY = new int[MAX_COMPOSITION_OBJECTS];
+    private int compositionObjectCount;
+    private int compositionObjectIndex;
 
     public CueBuilder() {
       bitmapData = new ParsableByteArray();
       colors = new int[256];
+      argbBitmapData = new int[0];
     }
 
     private void parsePaletteSection(ParsableByteArray buffer, int sectionLength) {
       if ((sectionLength % 5) != 2) {
-        // Section must be two bytes then a whole number of (index, Y, Cr, Cb, alpha) entries.
         return;
       }
       buffer.skipBytes(2);
-
       Arrays.fill(colors, 0);
       int entryCount = sectionLength / 5;
       for (int i = 0; i < entryCount; i++) {
@@ -200,39 +213,69 @@ public final class PgsParser implements SubtitleParser {
         int bytesToRead = min(sectionLength, limit - position);
         buffer.readBytes(bitmapData.getData(), position, bytesToRead);
         bitmapData.setPosition(position + bytesToRead);
+        hasBitmapDataForCurrentObject = true;
       }
     }
 
     private void parseIdentifierSection(ParsableByteArray buffer, int sectionLength) {
-      if (sectionLength < 19) {
+      if (sectionLength < 11) {
         return;
       }
-      planeWidth = buffer.readUnsignedShort();
-      planeHeight = buffer.readUnsignedShort();
-      buffer.skipBytes(11);
-      bitmapX = buffer.readUnsignedShort();
-      bitmapY = buffer.readUnsignedShort();
+      int newPlaneWidth = buffer.readUnsignedShort();
+      int newPlaneHeight = buffer.readUnsignedShort();
+      buffer.skipBytes(3); // frame rate (1), composition number (2)
+      int compositionState = buffer.readUnsignedByte();
+      buffer.skipBytes(2); // palette update flag (1), palette id (1)
+      if (compositionState == COMPOSITION_STATE_EPOCH_START) {
+        reset();
+      }
+      hasBitmapDataForCurrentObject = false;
+      planeWidth = newPlaneWidth;
+      planeHeight = newPlaneHeight;
+      int numObjects = buffer.readUnsignedByte();
+      int remaining = sectionLength - 11;
+      compositionObjectCount = 0;
+      compositionObjectIndex = 0;
+      for (int i = 0;
+          i < numObjects && remaining >= 8 && compositionObjectCount < MAX_COMPOSITION_OBJECTS;
+          i++) {
+        buffer.skipBytes(3); // object_id (2), window_id (1)
+        int croppedFlag = buffer.readUnsignedByte();
+        int x = buffer.readUnsignedShort();
+        int y = buffer.readUnsignedShort();
+        remaining -= 8;
+        if ((croppedFlag & 0x40) != 0 && remaining >= 8) {
+          buffer.skipBytes(8); // cropping position and size
+          remaining -= 8;
+        }
+        compositionObjectX[compositionObjectCount] = x;
+        compositionObjectY[compositionObjectCount] = y;
+        compositionObjectCount++;
+      }
     }
 
     @Nullable
     public Cue build() {
-      if (planeWidth == 0
-          || planeHeight == 0
-          || bitmapWidth == 0
-          || bitmapHeight == 0
-          || bitmapData.limit() == 0
-          || bitmapData.getPosition() != bitmapData.limit()
-          || !colorsSet) {
+      if (!isBitmapComplete()) {
         return null;
       }
-      // Build the bitmapData.
+      int x = 0;
+      int y = 0;
+      if (compositionObjectIndex < compositionObjectCount) {
+        x = compositionObjectX[compositionObjectIndex];
+        y = compositionObjectY[compositionObjectIndex];
+        compositionObjectIndex++;
+      }
       bitmapData.setPosition(0);
-      int[] argbBitmapData = new int[bitmapWidth * bitmapHeight];
-      int argbBitmapDataIndex = 0;
-      while (argbBitmapDataIndex < argbBitmapData.length) {
+      int pixelCount = bitmapWidth * bitmapHeight;
+      if (argbBitmapData.length < pixelCount) {
+        argbBitmapData = new int[pixelCount];
+      }
+      int index = 0;
+      while (index < pixelCount) {
         int colorIndex = bitmapData.readUnsignedByte();
         if (colorIndex != 0) {
-          argbBitmapData[argbBitmapDataIndex++] = colors[colorIndex];
+          argbBitmapData[index++] = colors[colorIndex];
         } else {
           int switchBits = bitmapData.readUnsignedByte();
           if (switchBits != 0) {
@@ -242,35 +285,52 @@ public final class PgsParser implements SubtitleParser {
                     : (((switchBits & 0x3F) << 8) | bitmapData.readUnsignedByte());
             int color =
                 (switchBits & 0x80) == 0 ? colors[0] : colors[bitmapData.readUnsignedByte()];
-            Arrays.fill(
-                argbBitmapData, argbBitmapDataIndex, argbBitmapDataIndex + runLength, color);
-            argbBitmapDataIndex += runLength;
+            Arrays.fill(argbBitmapData, index, index + runLength, color);
+            index += runLength;
           }
         }
       }
       Bitmap bitmap =
           Bitmap.createBitmap(argbBitmapData, bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
-      // Build the cue.
       return new Cue.Builder()
           .setBitmap(bitmap)
-          .setPosition((float) bitmapX / planeWidth)
+          .setPosition((float) x / planeWidth)
           .setPositionAnchor(Cue.ANCHOR_TYPE_START)
-          .setLine((float) bitmapY / planeHeight, Cue.LINE_TYPE_FRACTION)
+          .setLine((float) y / planeHeight, Cue.LINE_TYPE_FRACTION)
           .setLineAnchor(Cue.ANCHOR_TYPE_START)
           .setSize((float) bitmapWidth / planeWidth)
           .setBitmapHeight((float) bitmapHeight / planeHeight)
           .build();
     }
 
+    public boolean isBitmapComplete() {
+      return hasBitmapDataForCurrentObject
+          && planeWidth != 0
+          && planeHeight != 0
+          && bitmapWidth != 0
+          && bitmapHeight != 0
+          && bitmapData.limit() != 0
+          && bitmapData.getPosition() == bitmapData.limit()
+          && colorsSet;
+    }
+
+    public void resetBitmapOnly() {
+      bitmapWidth = 0;
+      bitmapHeight = 0;
+      bitmapData.reset(0);
+      hasBitmapDataForCurrentObject = false;
+    }
+
     public void reset() {
       planeWidth = 0;
       planeHeight = 0;
-      bitmapX = 0;
-      bitmapY = 0;
       bitmapWidth = 0;
       bitmapHeight = 0;
       bitmapData.reset(0);
       colorsSet = false;
+      hasBitmapDataForCurrentObject = false;
+      compositionObjectCount = 0;
+      compositionObjectIndex = 0;
     }
   }
 }
