@@ -79,6 +79,18 @@ public final class MediaCodecUtil {
   private MediaCodecUtil() {}
 
   /**
+    * Whether to force disable the frame rate check for playback.
+    *
+    * <p>When set to true, the frame rate check is disabled for playback.
+  */
+  public static boolean forceDisableFrameRateCheck = false;
+
+  public static void forceDisableFrameRateCheck(boolean isDisabled) {
+    forceDisableFrameRateCheck = isDisabled;
+  }
+
+
+  /**
    * Optional call to warm the codec cache for a given MIME type.
    *
    * <p>Calling this method may speed up subsequent calls to {@link #getDecoderInfo(String, boolean,

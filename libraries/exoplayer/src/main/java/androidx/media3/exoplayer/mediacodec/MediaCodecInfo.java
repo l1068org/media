@@ -607,6 +607,11 @@ public final class MediaCodecInfo {
       return false;
     }
 
+    // frame rate check
+    if (MediaCodecUtil.forceDisableFrameRateCheck) {
+      return videoCapabilities.isSizeSupported(width, height);
+    }
+
     if (SDK_INT >= 29) {
       @MediaCodecPerformancePointCoverageProvider.PerformancePointCoverageResult
       int evaluation =

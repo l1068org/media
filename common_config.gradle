@@ -17,6 +17,7 @@ group = 'androidx.media3'
 
 android {
     compileSdkVersion project.ext.compileSdkVersion
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         minSdkVersion project.ext.minSdkVersion
