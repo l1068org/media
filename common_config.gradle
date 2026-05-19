@@ -13,7 +13,7 @@
 // limitations under the License.
 apply from: "$gradle.ext.androidxMediaSettingsDir/constants.gradle"
 
-group = 'androidx.media3'
+group = 'com.github.l1068'
 
 android {
     compileSdkVersion project.ext.compileSdkVersion
