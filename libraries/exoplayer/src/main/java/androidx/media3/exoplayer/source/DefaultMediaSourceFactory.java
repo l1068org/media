@@ -182,7 +182,7 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
   @UnstableApi
   public DefaultMediaSourceFactory(
       DataSource.Factory dataSourceFactory, ExtractorsFactory extractorsFactory) {
-    this(dataSourceFactory, extractorsFactory, new DefaultSubtitleParserFactory());
+    this(dataSourceFactory, extractorsFactory, DefaultSubtitleParserFactory.createForExtraction());
   }
 
   /**
@@ -621,7 +621,9 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
                   new Extractor[] {
                     subtitleParserFactory.supportsFormat(format)
                         ? new SubtitleExtractor(
-                            subtitleParserFactory.create(format), /* format= */ null)
+                            subtitleParserFactory.create(format),
+                            /* format= */ null,
+                            format.sampleMimeType)
                         : new UnknownSubtitlesExtractor(format)
                   };
           ProgressiveMediaSource.Factory progressiveMediaSourceFactory =
