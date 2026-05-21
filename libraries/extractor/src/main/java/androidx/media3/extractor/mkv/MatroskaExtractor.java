@@ -2020,6 +2020,13 @@ public class MatroskaExtractor implements Extractor {
       if (track.trueHdSampleRechunker != null) {
         checkState(sampleStrippedBytes.limit() == 0);
         track.trueHdSampleRechunker.startSample(input);
+        if (!track.trueHdAtmosAnalysisComplete && track.trueHdSampleRechunker.hasSyncFrame()) {
+          track.trueHdAtmosAnalysisComplete = true;
+          if (track.trueHdSampleRechunker.isAtmos()) {
+            track.format = checkNotNull(track.format).buildUpon().setCodecs("atmos").build();
+            track.output.format(track.format);
+          }
+        }
       }
       while (sampleBytesRead < size) {
         int bytesWritten = writeToOutput(input, output, size - sampleBytesRead);
@@ -2439,6 +2446,7 @@ public class MatroskaExtractor implements Extractor {
     public long seekPreRollNs = 0;
     public @MonotonicNonNull TrueHdSampleRechunker trueHdSampleRechunker;
     public boolean waitingForDtsAnalysis = false;
+    public boolean trueHdAtmosAnalysisComplete = false;
 
     // Text elements.
     public boolean flagForced;
@@ -2776,6 +2784,7 @@ public class MatroskaExtractor implements Extractor {
     public void reset() {
       if (trueHdSampleRechunker != null) {
         trueHdSampleRechunker.reset();
+        trueHdAtmosAnalysisComplete = false;
       }
     }
 
