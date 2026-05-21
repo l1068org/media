@@ -151,6 +151,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   private long nextBufferToWritePresentationTimeUs;
   private long firstNotReadyTimeMs;
   private boolean hasBeenReady;
+  private long audioOffsetUs;
 
   /**
    * @param context A context.
@@ -927,9 +928,10 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       return true;
     }
 
+    long audioPresentationTimeUs = getAudioPresentationTimeUs(bufferPresentationTimeUs);
     boolean fullyConsumed;
     try {
-      fullyConsumed = audioSink.handleBuffer(buffer, bufferPresentationTimeUs, sampleCount);
+      fullyConsumed = audioSink.handleBuffer(buffer, audioPresentationTimeUs, sampleCount);
     } catch (InitializationException e) {
       throw createRendererException(
           e,
@@ -968,7 +970,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     } else {
       // Downstream buffers are full, set nextBufferToWritePresentationTimeUs to the presentation
       // time of the current 'to be written' sample.
-      nextBufferToWritePresentationTimeUs = bufferPresentationTimeUs;
+      nextBufferToWritePresentationTimeUs = audioPresentationTimeUs;
     }
 
     return false;
@@ -1035,6 +1037,9 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
         break;
       case MSG_SET_AUDIO_OUTPUT_PROVIDER:
         audioSink.setAudioOutputProvider((AudioOutputProvider) checkNotNull(message));
+        break;
+      case MSG_SET_AUDIO_OFFSET:
+        setAudioOffsetMs((Long) checkNotNull(message));
         break;
       default:
         super.handleMessage(messageType, message);
@@ -1208,6 +1213,16 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
               : max(currentPositionUs, newCurrentPositionUs);
       allowPositionDiscontinuity = false;
     }
+  }
+
+  private void setAudioOffsetMs(long audioOffsetMs) {
+    audioOffsetUs = Util.msToUs(audioOffsetMs);
+    audioSink.handleDiscontinuity();
+    allowPositionDiscontinuity = true;
+  }
+
+  private long getAudioPresentationTimeUs(long rendererPresentationTimeUs) {
+    return rendererPresentationTimeUs + audioOffsetUs;
   }
 
   /**
