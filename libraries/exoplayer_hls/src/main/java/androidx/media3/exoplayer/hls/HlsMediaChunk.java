@@ -446,7 +446,12 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     maybeLoadInitData();
     if (!loadCanceled) {
       if (!hasGapTag) {
-        loadMedia();
+        try {
+          loadMedia();
+        } catch (IOException e) {
+          // Segment unavailable (file not found, HTTP error, etc.); treat as a gap and skip
+          // silently.
+        }
       }
       loadCompleted = !loadCanceled;
     }
