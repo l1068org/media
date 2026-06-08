@@ -41,6 +41,8 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.DeviceInfo;
+import androidx.media3.common.MediaChapter;
+import androidx.media3.common.MediaEdition;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
@@ -1367,6 +1369,16 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
   }
 
   @Override
+  public List<MediaChapter> getCurrentMediaChapters() {
+    return ImmutableList.of();
+  }
+
+  @Override
+  public List<MediaEdition> getCurrentMediaEditions() {
+    return ImmutableList.of();
+  }
+
+  @Override
   public TrackSelectionParameters getTrackSelectionParameters() {
     return TrackSelectionParameters.DEFAULT;
   }
@@ -2464,6 +2476,8 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
             seekForwardIncrementMs,
             maxSeekToPreviousPositionMs,
             /* currentTracks= */ Tracks.EMPTY,
+            /* currentMediaChapters= */ ImmutableList.of(),
+            /* currentMediaEditions= */ ImmutableList.of(),
             /* parameters= */ TrackSelectionParameters.DEFAULT);
 
     return new ControllerInfo(
