@@ -3047,6 +3047,8 @@ public class MatroskaExtractor implements Extractor {
         }
       }
       if (!chapters.isEmpty()) {
+        chapters.sort(
+            (first, second) -> Long.compare(first.getStartTimeMs(), second.getStartTimeMs()));
         format =
             checkNotNull(format)
                 .buildUpon()
