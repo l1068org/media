@@ -43,6 +43,7 @@ import androidx.media3.extractor.mp4.FragmentedMp4Extractor;
 import androidx.media3.extractor.mp4.Mp4Extractor;
 import androidx.media3.extractor.ogg.OggExtractor;
 import androidx.media3.extractor.png.PngExtractor;
+import androidx.media3.extractor.rm.RmExtractor;
 import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
 import androidx.media3.extractor.text.SubtitleParser;
 import androidx.media3.extractor.ts.Ac3Extractor;
@@ -92,10 +93,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>JPEG ({@link JpegExtractor})
  *   <li>PNG ({@link PngExtractor})
  *   <li>WEBP ({@link WebpExtractor})
- *   <li>BMP ({@link BmpExtractor})
- *   <li>HEIF ({@link HeifExtractor})
- *   <li>AVIF ({@link AvifExtractor})
- *   <li>DTS ({@link DtsExtractor})
+   *   <li>BMP ({@link BmpExtractor})
+   *   <li>HEIF ({@link HeifExtractor})
+   *   <li>RM ({@link RmExtractor})
+   *   <li>AVIF ({@link AvifExtractor})
+   *   <li>DTS ({@link DtsExtractor})
  *   <li>MIDI, if available, the MIDI extension's {@code androidx.media3.decoder.midi.MidiExtractor}
  *       is used.
  * </ul>
@@ -124,6 +126,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
         FileTypes.MP3,
         // The following extractors are not part of the optimized ordering, and were appended
         // without further analysis.
+        FileTypes.RM,
         FileTypes.AVI,
         FileTypes.MIDI,
         FileTypes.JPEG,
@@ -592,6 +595,9 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
         break;
       case FileTypes.AVIF:
         extractors.add(new AvifExtractor());
+        break;
+      case FileTypes.RM:
+        extractors.add(new RmExtractor());
         break;
       case FileTypes.DTS:
         extractors.add(new DtsExtractor());
