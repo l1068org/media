@@ -109,11 +109,6 @@ public final class MimeTypes {
   @UnstableApi
   public static final String AUDIO_DTS_UHD_P2 = BASE_TYPE_AUDIO + "/vnd.dts.uhd;profile=p2";
 
-  /**
-   * @deprecated Use {@link #AUDIO_DTS_UHD_P2} instead.
-   */
-  @Deprecated @UnstableApi public static final String AUDIO_DTS_X = AUDIO_DTS_UHD_P2;
-
   public static final String AUDIO_VORBIS = BASE_TYPE_AUDIO + "/vorbis";
   public static final String AUDIO_OPUS = BASE_TYPE_AUDIO + "/opus";
   public static final String AUDIO_AMR = BASE_TYPE_AUDIO + "/amr";
@@ -214,6 +209,12 @@ public final class MimeTypes {
    * registered codec types</a>.
    */
   @UnstableApi public static final String CODEC_E_AC3_JOC = "ec+3";
+
+  /** Codec marker for DTS-HD MA streams that carry a DTS:X extension. */
+  @UnstableApi public static final String CODEC_DTS_HD_MA_X = "dtsma-x";
+
+  /** Codec marker for DTS-HD MA streams that carry a DTS:X IMAX extension. */
+  @UnstableApi public static final String CODEC_DTS_HD_MA_X_IMAX = "dtsma-x-imax";
 
   private static final ArrayList<CustomMimeType> customMimeTypes = new ArrayList<>();
 
@@ -525,8 +526,11 @@ public final class MimeTypes {
       return MimeTypes.AUDIO_DTS_HD;
     } else if (codec.startsWith("dtsl")) {
       return MimeTypes.AUDIO_MEDIA3_DTS_HD_MA_CORELESS;
+    } else if (codec.startsWith(CODEC_DTS_HD_MA_X_IMAX)
+        || codec.startsWith(CODEC_DTS_HD_MA_X)) {
+      return MimeTypes.AUDIO_DTS_HD_MA;
     } else if (codec.startsWith("dtsx")) {
-      return MimeTypes.AUDIO_DTS_X;
+      return MimeTypes.AUDIO_DTS_UHD_P2;
     } else if (codec.startsWith("opus")) {
       return MimeTypes.AUDIO_OPUS;
     } else if (codec.startsWith("vorbis")) {
@@ -735,7 +739,7 @@ public final class MimeTypes {
         return C.ENCODING_DTS_HD_MA;
       case MimeTypes.AUDIO_DTS_EXPRESS:
         return C.ENCODING_DTS_HD;
-      case MimeTypes.AUDIO_DTS_X:
+      case MimeTypes.AUDIO_DTS_UHD_P2:
         return C.ENCODING_DTS_UHD_P2;
       case MimeTypes.AUDIO_TRUEHD:
         return C.ENCODING_DOLBY_TRUEHD;
