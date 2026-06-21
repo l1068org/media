@@ -40,6 +40,7 @@ import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.UriUtil;
 import androidx.media3.common.util.Util;
+import androidx.media3.exoplayer.drm.ClearKeyUtil;
 import androidx.media3.exoplayer.hls.HlsTrackMetadataEntry;
 import androidx.media3.exoplayer.hls.HlsTrackMetadataEntry.VariantInfo;
 import androidx.media3.exoplayer.hls.playlist.HlsMediaPlaylist.Interstitial;
@@ -500,6 +501,12 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
           String method = parseStringAttr(line, REGEX_METHOD, variableDefinitions, matcherCache);
           String scheme = parseEncryptionScheme(method);
           sessionKeyDrmInitData.add(new DrmInitData(scheme, schemeData));
+          byte[] data = ClearKeyUtil.buildClearKeyPssh(line, schemeData);
+          if (data != null) {
+            sessionKeyDrmInitData.add(
+                new DrmInitData(
+                    scheme, new SchemeData(C.CLEARKEY_UUID, null, MimeTypes.VIDEO_MP4, data)));
+          }
         }
       } else if (line.startsWith(TAG_CONTENT_STEERING)) {
         if (contentSteeringInfo != null) {
@@ -1084,6 +1091,11 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
             if (schemeData != null) {
               cachedDrmInitData = null;
               currentSchemeDatas.put(keyFormat, schemeData);
+              byte[] data = ClearKeyUtil.buildClearKeyPssh(line, schemeData);
+              if (data != null) {
+                currentSchemeDatas.put(
+                    "clearkey", new SchemeData(C.CLEARKEY_UUID, null, MimeTypes.VIDEO_MP4, data));
+              }
             }
           }
         }
