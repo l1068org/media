@@ -63,6 +63,15 @@ public interface TsPayloadReader {
      */
     @Nullable
     TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo);
+
+    /**
+     * Returns a {@link TsPayloadReader} for a given stream type, elementary PID, and elementary
+     * stream information.
+     */
+    @Nullable
+    default TsPayloadReader createPayloadReader(int streamType, int elementaryPid, EsInfo esInfo) {
+      return createPayloadReader(streamType, esInfo);
+    }
   }
 
   /** Holds information associated with a PMT entry. */
