@@ -1054,5 +1054,24 @@ public final class DtsUtil {
     return header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46;
   }
 
+  public static int findDtsCoreSync(ExtractorInput input, int maxBytesToSearch) throws IOException {
+    byte[] scratch = new byte[4];
+    input.peekFully(scratch, 0, 2);
+    int bytesSniffed = 2;
+    maxBytesToSearch -= 2;
+    while (maxBytesToSearch >= 2) {
+      input.peekFully(scratch, 2, 2);
+      bytesSniffed += 2;
+      maxBytesToSearch -= 2;
+      int word = readSyncWord(scratch);
+      if (getFrameType(word) == FRAME_TYPE_CORE) {
+        return bytesSniffed - 4;
+      }
+      scratch[0] = scratch[2];
+      scratch[1] = scratch[3];
+    }
+    return -1;
+  }
+
   private DtsUtil() {}
 }
