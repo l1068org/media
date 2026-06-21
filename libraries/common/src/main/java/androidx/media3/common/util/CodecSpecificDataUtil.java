@@ -456,10 +456,8 @@ public final class CodecSpecificDataUtil {
    * @param dvCsd The Dolby Vision configuration record bytes.
    * @return A new mutable list with the DV config at index 2.
    */
-  public static List<byte[]> setDolbyVisionCsd(
-      @Nullable List<byte[]> initializationData, byte[] dvCsd) {
-    List<byte[]> result =
-        initializationData != null ? new ArrayList<>(initializationData) : new ArrayList<>();
+  public static List<byte[]> setDolbyVisionCsd(@Nullable List<byte[]> initializationData, byte[] dvCsd) {
+    List<byte[]> result = initializationData != null ? new ArrayList<>(initializationData) : new ArrayList<>();
     while (result.size() < 2) {
       result.add(new byte[0]);
     }
