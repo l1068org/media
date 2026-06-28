@@ -37,6 +37,7 @@ import androidx.media3.common.Label;
 import androidx.media3.common.Metadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
+import androidx.media3.common.util.CodecSpecificDataUtil;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.ParsableByteArray;
@@ -2708,6 +2709,9 @@ public class MatroskaExtractor implements Extractor {
         if (dolbyVisionConfig != null) {
           codecs = dolbyVisionConfig.codecs;
           mimeType = MimeTypes.VIDEO_DOLBY_VISION;
+          initializationData =
+              CodecSpecificDataUtil.setDolbyVisionCsd(
+                  initializationData, this.dolbyVisionConfigBytes);
         }
       }
 
