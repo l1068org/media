@@ -215,7 +215,7 @@ public final class MediaCodecUtil {
             format.sampleMimeType, requiresSecureDecoder, requiresTunnelingDecoder);
     List<MediaCodecInfo> alternativeDecoderInfos =
         getAlternativeDecoderInfos(
-            mediaCodecSelector, format, requiresSecureDecoder, requiresTunnelingDecoder);
+            mediaCodecSelector, format, requiresSecureDecoder, requiresTunnelingDecoder, false);
     return ImmutableList.<MediaCodecInfo>builder()
         .addAll(decoderInfos)
         .addAll(alternativeDecoderInfos)
@@ -244,9 +244,10 @@ public final class MediaCodecUtil {
       MediaCodecSelector mediaCodecSelector,
       Format format,
       boolean requiresSecureDecoder,
-      boolean requiresTunnelingDecoder)
+      boolean requiresTunnelingDecoder,
+      boolean mapDV7ToHevc)
       throws DecoderQueryException {
-    List<String> alternativeMimeTypes = getAlternativeCodecMimeTypes(format);
+    List<String> alternativeMimeTypes = getAlternativeCodecMimeTypes(format, mapDV7ToHevc);
     if (alternativeMimeTypes.isEmpty()) {
       return ImmutableList.of();
     }
@@ -371,6 +372,11 @@ public final class MediaCodecUtil {
     return getHevcProfileAndLevel(codecs, parts, format.colorInfo);
   }
 
+  @Nullable
+  public static List<String> getAlternativeCodecMimeTypes(Format format) {
+    return getAlternativeCodecMimeTypes(format, false);
+  }
+
   /**
    * Returns alternative codec MIME types (besides the default {@link Format#sampleMimeType}) that
    * can be used to decode samples of the provided {@link Format}, in order of preference.
@@ -380,7 +386,7 @@ public final class MediaCodecUtil {
    *     Format} (besides the default {@link Format#sampleMimeType}), or an empty list if no such
    *     alternative exists.
    */
-  public static List<String> getAlternativeCodecMimeTypes(Format format) {
+  public static List<String> getAlternativeCodecMimeTypes(Format format, boolean mapDV7ToHevc) {
     if (MimeTypes.AUDIO_E_AC3_JOC.equals(format.sampleMimeType)) {
       // E-AC3 decoders can decode JOC streams, but in 2-D rather than 3-D.
       // Some devices (e.g. Pixel) integrate an EAC3 decoder that does not support EAC3-JOC
@@ -417,8 +423,9 @@ public final class MediaCodecUtil {
       if (codecProfileAndLevel != null && codecProfileAndLevel.isSupportableByMediaCodec()) {
         int profile = codecProfileAndLevel.getProfile();
         if (profile == CodecProfileLevel.DolbyVisionProfileDvheDtr
-            || profile == CodecProfileLevel.DolbyVisionProfileDvheSt) {
-          return Collections.singletonList(MimeTypes.VIDEO_H265);
+            || profile == CodecProfileLevel.DolbyVisionProfileDvheSt
+            || (mapDV7ToHevc && profile == CodecProfileLevel.DolbyVisionProfileDvheDtb)) {
+           return Collections.singletonList(MimeTypes.VIDEO_H265);
         } else if (profile == CodecProfileLevel.DolbyVisionProfileDvavSe) {
           return Collections.singletonList(MimeTypes.VIDEO_H264);
         } else if (profile == CodecProfileLevel.DolbyVisionProfileDvav110) {
