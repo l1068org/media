@@ -41,7 +41,7 @@ afterEvaluate {
       publications {
         register<MavenPublication>("release") {
           from(components["release"])
-          groupId = "androidx.media3"
+          groupId = "com.github.l1068"
           artifactId = Media3Modules.EXTERNAL_MODULES[project.name]?.artifactId ?: ""
           version = libs.findVersion("releaseVersion").get().requiredVersion
 
