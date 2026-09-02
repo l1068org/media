@@ -94,7 +94,7 @@ fun addMissingAarTypeToXml(xml: XmlProvider) {
       val artifactId = artifactIdNode?.children()?.firstOrNull()?.toString()
 
       val dependencyName = "$groupId:$artifactId"
-      val isProjectLibrary = groupId == "androidx.media3"
+      val isProjectLibrary = groupId == "com.github.l1068"
 
       val hasJar = jarOnlyDependencies.contains(dependencyName)
       val hasAar = isProjectLibrary || aarDependencies.contains(dependencyName)

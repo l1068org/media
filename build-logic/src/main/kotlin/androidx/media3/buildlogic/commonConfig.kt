@@ -30,6 +30,8 @@ fun Project.configureCommonConfig(android: CommonExtension, libs: VersionCatalog
   android.apply {
     compileSdk = libs.findVersion("compileSdkVersion").get().requiredVersion.toInt()
 
+    ndkVersion = "29.0.14206865"
+
     defaultConfig.apply {
       minSdk = libs.findVersion("minSdkVersion").get().requiredVersion.toInt()
 

@@ -15,7 +15,7 @@ import androidx.media3.buildlogic.configureCommonConfig
 
 plugins { id("com.android.application") }
 
-group = "androidx.media3"
+group = "com.github.l1068"
 
 val libs: VersionCatalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
