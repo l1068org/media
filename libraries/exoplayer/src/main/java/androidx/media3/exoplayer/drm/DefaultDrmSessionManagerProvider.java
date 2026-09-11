@@ -16,11 +16,13 @@
 package androidx.media3.exoplayer.drm;
 
 import static androidx.media3.exoplayer.drm.DefaultDrmSessionManager.MODE_PLAYBACK;
+import static androidx.media3.exoplayer.drm.FrameworkMediaDrm.newInstance;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -105,7 +107,18 @@ public final class DefaultDrmSessionManagerProvider implements DrmSessionManager
     DefaultDrmSessionManager.Builder drmSessionManagerBuilder =
         new DefaultDrmSessionManager.Builder()
             .setUuidAndExoMediaDrmProvider(
-                drmConfiguration.scheme, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                drmConfiguration.scheme,
+                uuid -> {
+                  try {
+                    FrameworkMediaDrm mediaDrm = newInstance(uuid);
+                    if (drmConfiguration.securityLevel != null) mediaDrm.setPropertyString("securityLevel", drmConfiguration.securityLevel);
+                    return mediaDrm;
+                  } catch (UnsupportedDrmException e) {
+                    Log.e("FrameworkMediaDrm", "Failed to instantiate a FrameworkMediaDrm for uuid: " + uuid + ".");
+                    return new DummyExoMediaDrm();
+                  }
+                }
+            )
             .setMultiSession(drmConfiguration.multiSession)
             .setPlayClearSamplesWithoutKeys(drmConfiguration.playClearContentWithoutKey)
             .setUseDrmSessionsForClearContent(

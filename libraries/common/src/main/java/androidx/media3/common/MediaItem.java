@@ -641,6 +641,7 @@ public final class MediaItem {
 
       // TODO remove @Nullable annotation when the deprecated zero-arg constructor is removed.
       @Nullable private UUID scheme;
+      @Nullable private String securityLevel;
       @Nullable private Uri licenseUri;
       private ImmutableMap<String, String> licenseRequestHeaders;
       private boolean multiSession;
@@ -673,6 +674,7 @@ public final class MediaItem {
 
       private Builder(DrmConfiguration drmConfiguration) {
         this.scheme = drmConfiguration.scheme;
+        this.securityLevel = drmConfiguration.securityLevel;
         this.licenseUri = drmConfiguration.licenseUri;
         this.licenseRequestHeaders = drmConfiguration.licenseRequestHeaders;
         this.multiSession = drmConfiguration.multiSession;
@@ -697,6 +699,11 @@ public final class MediaItem {
       @Deprecated
       private Builder setNullableScheme(@Nullable UUID scheme) {
         this.scheme = scheme;
+        return this;
+      }
+
+      public Builder setSecurityLevel(String securityLevel) {
+        this.securityLevel = securityLevel;
         return this;
       }
 
@@ -829,6 +836,8 @@ public final class MediaItem {
     /** The UUID of the protection scheme. */
     public final UUID scheme;
 
+    @Nullable public final  String securityLevel;
+
     /**
      * @deprecated Use {@link #scheme} instead.
      */
@@ -880,6 +889,7 @@ public final class MediaItem {
       checkState(!(builder.forceDefaultLicenseUri && builder.licenseUri == null));
       this.scheme = checkNotNull(builder.scheme);
       this.uuid = scheme;
+      this.securityLevel = builder.securityLevel;
       this.licenseUri = builder.licenseUri;
       this.requestHeaders = builder.licenseRequestHeaders;
       this.licenseRequestHeaders = builder.licenseRequestHeaders;
