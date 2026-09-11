@@ -1542,6 +1542,13 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
         // Assume a min compression of 2 similar to the platform's SoftVPX.cpp.
         return getMaxSampleSize(/* pixelCount= */ width * height, /* minCompressionRatio= */ 2);
       case MimeTypes.VIDEO_H265:
+        // ITS-TVS: workaround for FireTV AFTMM to enable UHD playback
+        if("Amazon".equals(Util.MANUFACTURER)
+          && "AFTMM".equals(Util.MODEL)) {
+          return max(
+              HEVC_MAX_INPUT_SIZE_THRESHOLD,
+              getMaxSampleSize(/* pixelCount= */ width * height, /* minCompressionRatio= */ 4));
+        }
         // Assume a min compression of 2 similar to the platform's C2SoftHevcDec.cpp, but restrict
         // the minimum size.
         return max(
