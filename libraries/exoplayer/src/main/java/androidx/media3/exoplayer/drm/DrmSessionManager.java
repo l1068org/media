@@ -173,4 +173,13 @@ public interface DrmSessionManager {
    */
   @C.CryptoType
   int getCryptoType(Format format);
+
+  /**
+   * Returns the format exposed to track selection and renderers, with this manager's crypto type.
+   * Managers decrypting samples before rendering may remove DRM metadata from this returned copy.
+   * The original format must be retained for sample queue DRM and decryption decisions.
+   */
+  default Format getCryptoFormat(Format format) {
+    return format.copyWithCryptoType(getCryptoType(format));
+  }
 }

@@ -34,6 +34,7 @@ import androidx.media3.common.DataReader;
 import androidx.media3.common.DrmInitData;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
+import androidx.media3.common.PlaybackException;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.ParsableByteArray;
@@ -42,15 +43,18 @@ import androidx.media3.decoder.DecoderInputBuffer;
 import androidx.media3.decoder.DecoderInputBuffer.InsufficientCapacityException;
 import androidx.media3.exoplayer.FormatHolder;
 import androidx.media3.exoplayer.analytics.PlayerId;
+import androidx.media3.exoplayer.drm.ClearKeySampleDecryptor;
 import androidx.media3.exoplayer.drm.DrmSession;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener.EventDispatcher;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManager.DrmSessionReference;
+import androidx.media3.exoplayer.drm.LocalClearKeySessionManager;
 import androidx.media3.exoplayer.source.SampleStream.ReadFlags;
 import androidx.media3.exoplayer.upstream.Allocator;
 import androidx.media3.extractor.TrackOutput;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.Objects;
 
 /** A queue of media samples. */
@@ -87,6 +91,8 @@ public class SampleQueue implements TrackOutput {
 
   @Nullable private Format downstreamFormat;
   @Nullable private DrmSession currentDrmSession;
+  @Nullable private ClearKeySampleDecryptor sampleDecryptor;
+  @Nullable private DrmSession.DrmSessionException sampleDecryptionError;
 
   private int capacity;
   private long[] sourceIds;
@@ -224,6 +230,11 @@ public class SampleQueue implements TrackOutput {
    */
   @CallSuper
   public void reset(boolean resetUpstreamFormat) {
+    if (sampleDecryptionError != null) {
+      // Retry decryption setup on the next format read, including after initialization failures.
+      downstreamFormat = null;
+    }
+    sampleDecryptionError = null;
     sampleDataQueue.reset();
     length = 0;
     absoluteFirstIndex = 0;
@@ -336,6 +347,9 @@ public class SampleQueue implements TrackOutput {
    */
   @CallSuper
   public void maybeThrowError() throws IOException {
+    if (sampleDecryptionError != null) {
+      throw sampleDecryptionError;
+    }
     // TODO: Avoid throwing if the DRM error is not preventing a read operation.
     if (currentDrmSession != null && currentDrmSession.getState() == DrmSession.STATE_ERROR) {
       throw checkNotNull(currentDrmSession.getError());
@@ -433,6 +447,9 @@ public class SampleQueue implements TrackOutput {
   @SuppressWarnings("ReferenceEquality") // See comments in setUpstreamFormat
   @CallSuper
   public synchronized boolean isReady(boolean loadingFinished) {
+    if (sampleDecryptionError != null) {
+      return false;
+    }
     int readIndex = getReadIndex();
     if (readEndTimeAbsoluteIndex != C.INDEX_UNSET && readIndex >= readEndTimeAbsoluteIndex) {
       return true;
@@ -473,6 +490,9 @@ public class SampleQueue implements TrackOutput {
       DecoderInputBuffer buffer,
       @ReadFlags int readFlags,
       boolean loadingFinished) {
+    if (sampleDecryptionError != null) {
+      return C.RESULT_NOTHING_READ;
+    }
     int result =
         peekSampleMetadata(
             formatHolder,
@@ -483,10 +503,21 @@ public class SampleQueue implements TrackOutput {
     if (result == C.RESULT_BUFFER_READ && !buffer.isEndOfStream()) {
       boolean peek = (readFlags & FLAG_PEEK) != 0;
       if ((readFlags & FLAG_OMIT_SAMPLE_DATA) == 0) {
+        int sampleOffset = buffer.data == null ? 0 : buffer.data.position();
         if (peek) {
           sampleDataQueue.peekToBuffer(buffer, extrasHolder);
         } else {
           sampleDataQueue.readToBuffer(buffer, extrasHolder);
+        }
+        if (sampleDecryptor != null) {
+          try {
+            sampleDecryptor.decrypt(buffer, sampleOffset);
+          } catch (GeneralSecurityException e) {
+            sampleDecryptionError =
+                new DrmSession.DrmSessionException(
+                    e, PlaybackException.ERROR_CODE_DRM_CONTENT_ERROR);
+            return C.RESULT_NOTHING_READ;
+          }
         }
       }
       if (!peek) {
@@ -858,12 +889,15 @@ public class SampleQueue implements TrackOutput {
   }
 
   private void releaseDrmSessionReferences() {
+    if (sampleDecryptor != null || currentDrmSession != null || sampleDecryptionError != null) {
+      // Recreate DRM resources on the next read even if the format is unchanged.
+      downstreamFormat = null;
+    }
+    sampleDecryptor = null;
+    sampleDecryptionError = null;
     if (currentDrmSession != null) {
       currentDrmSession.release(drmEventDispatcher);
       currentDrmSession = null;
-      // Clear downstream format to avoid violating the assumption that downstreamFormat.drmInitData
-      // != null implies currentSession != null
-      downstreamFormat = null;
     }
   }
 
@@ -1008,9 +1042,7 @@ public class SampleQueue implements TrackOutput {
     @Nullable DrmInitData newDrmInitData = newFormat.drmInitData;
 
     outputFormatHolder.format =
-        drmSessionManager != null
-            ? newFormat.copyWithCryptoType(drmSessionManager.getCryptoType(newFormat))
-            : newFormat;
+        drmSessionManager != null ? drmSessionManager.getCryptoFormat(newFormat) : newFormat;
     outputFormatHolder.drmSession = currentDrmSession;
     if (drmSessionManager == null) {
       // This sample queue is not expected to handle DRM. Nothing to do.
@@ -1019,6 +1051,16 @@ public class SampleQueue implements TrackOutput {
     if (!isFirstFormat && Objects.equals(oldDrmInitData, newDrmInitData)) {
       // Nothing to do.
       return;
+    }
+    sampleDecryptor = null;
+    if (drmSessionManager instanceof LocalClearKeySessionManager) {
+      try {
+        sampleDecryptor =
+            ((LocalClearKeySessionManager) drmSessionManager).createSampleDecryptor(newFormat);
+      } catch (GeneralSecurityException e) {
+        sampleDecryptionError =
+            new DrmSession.DrmSessionException(e, PlaybackException.ERROR_CODE_DRM_SYSTEM_ERROR);
+      }
     }
     // Ensure we acquire the new session before releasing the previous one in case the same session
     // is being used for both DrmInitData.
