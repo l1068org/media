@@ -1595,7 +1595,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       Format[] exposedFormats = new Format[trackGroup.length];
       for (int j = 0; j < trackGroup.length; j++) {
         Format format = trackGroup.getFormat(j);
-        exposedFormats[j] = format.copyWithCryptoType(drmSessionManager.getCryptoType(format));
+        exposedFormats[j] = drmSessionManager.getCryptoFormat(format);
       }
       trackGroups[i] = new TrackGroup(trackGroup.id, exposedFormats);
     }

@@ -25,7 +25,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.net.Uri;
+import androidx.media3.common.C;
 import androidx.media3.common.Format;
+import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.datasource.TransferListener;
@@ -34,6 +36,7 @@ import androidx.media3.exoplayer.dash.PlayerEmsgHandler.PlayerEmsgCallback;
 import androidx.media3.exoplayer.dash.manifest.AdaptationSet;
 import androidx.media3.exoplayer.dash.manifest.DashManifest;
 import androidx.media3.exoplayer.dash.manifest.DashManifestParser;
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.source.CompositeSequenceableLoaderFactory;
@@ -51,8 +54,10 @@ import androidx.media3.test.utils.TestUtil;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.common.collect.ImmutableList;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -61,6 +66,53 @@ import org.mockito.ArgumentCaptor;
 /** Unit tests for {@link DashMediaPeriod}. */
 @RunWith(AndroidJUnit4.class)
 public final class DashMediaPeriodTest {
+
+  @Test
+  public void localClearKeyCbcs_exposesSelectableClearTracksButKeepsManifestEncryption()
+      throws Exception {
+    String xml =
+        "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" xmlns:cenc=\"urn:mpeg:cenc:2013\""
+            + " mediaPresentationDuration=\"PT10S\" minBufferTime=\"PT1S\"><Period><AdaptationSet"
+            + " mimeType=\"video/mp4\"><ContentProtection"
+            + " schemeIdUri=\"urn:mpeg:dash:mp4protection:2011\" value=\"cbcs\""
+            + " cenc:default_KID=\"00000000-0000-0000-0000-000000000001\"/><Representation"
+            + " id=\"video\" bandwidth=\"1000000\" codecs=\"avc1.640028\" width=\"1280\""
+            + " height=\"720\"><BaseURL>video.mp4</BaseURL></Representation>"
+            + "</AdaptationSet></Period></MPD>";
+    DashManifest manifest =
+        new DashManifestParser()
+            .parse(Uri.EMPTY, new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+    String license =
+        "{\"keys\":[{\"kty\":\"oct\",\"kid\":\"AAAAAAAAAAAAAAAAAAAAAQ\",\"k\":\"K34VFiiu0qar9xWICc9PPA\"}]}";
+    MediaItem item =
+        new MediaItem.Builder()
+            .setUri("https://example.test/manifest.mpd")
+            .setDrmConfiguration(
+                new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID)
+                    .setLicenseUri(license)
+                    .build())
+            .build();
+    DashMediaPeriod period =
+        createDashMediaPeriod(
+            manifest,
+            mock(DashChunkSource.Factory.class),
+            0,
+            new DefaultDrmSessionManagerProvider().get(item));
+    Format exposed = period.getTrackGroups().get(0).getFormat(0);
+    assertThat(exposed.cryptoType).isEqualTo(C.CRYPTO_TYPE_NONE);
+    assertThat(exposed.drmInitData).isNull();
+    assertThat(
+            manifest
+                .getPeriod(0)
+                .adaptationSets
+                .get(0)
+                .representations
+                .get(0)
+                .format
+                .drmInitData
+                .schemeType)
+        .isEqualTo("cbcs");
+  }
 
   @Test
   public void getStreamKeys_isCompatibleWithDashManifestFilter() throws IOException {
@@ -386,6 +438,15 @@ public final class DashMediaPeriodTest {
 
   private static DashMediaPeriod createDashMediaPeriod(
       DashManifest manifest, DashChunkSource.Factory chunkSourceFactory, int periodIndex) {
+    return createDashMediaPeriod(
+        manifest, chunkSourceFactory, periodIndex, DrmSessionManager.DRM_UNSUPPORTED);
+  }
+
+  private static DashMediaPeriod createDashMediaPeriod(
+      DashManifest manifest,
+      DashChunkSource.Factory chunkSourceFactory,
+      int periodIndex,
+      DrmSessionManager drmSessionManager) {
     MediaPeriodId mediaPeriodId = new MediaPeriodId(/* periodUid= */ new Object());
     when(chunkSourceFactory.getOutputTextFormat(any()))
         .then(invocation -> invocation.getArguments()[0]);
@@ -397,7 +458,7 @@ public final class DashMediaPeriodTest {
         chunkSourceFactory,
         mock(TransferListener.class),
         /* cmcdConfiguration= */ null,
-        DrmSessionManager.DRM_UNSUPPORTED,
+        drmSessionManager,
         new DrmSessionEventListener.EventDispatcher()
             .withParameters(/* windowIndex= */ 0, mediaPeriodId),
         mock(LoadErrorHandlingPolicy.class),

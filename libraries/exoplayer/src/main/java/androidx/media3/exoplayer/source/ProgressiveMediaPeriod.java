@@ -1029,7 +1029,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
           trackFormat = trackFormat.buildUpon().setAverageBitrate(icyHeaders.bitrate).build();
         }
       }
-      trackFormat = trackFormat.copyWithCryptoType(drmSessionManager.getCryptoType(trackFormat));
+      trackFormat = drmSessionManager.getCryptoFormat(trackFormat);
       if (i != primaryTrackIndex) {
         trackFormat =
             trackFormat

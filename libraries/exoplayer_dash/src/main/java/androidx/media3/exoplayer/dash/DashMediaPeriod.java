@@ -803,11 +803,7 @@ import java.util.regex.Pattern;
       Format[] formats = new Format[representations.size()];
       for (int j = 0; j < formats.length; j++) {
         Format originalFormat = representations.get(j).format;
-        Format.Builder updatedFormat =
-            originalFormat
-                .buildUpon()
-                .setCryptoType(drmSessionManager.getCryptoType(originalFormat));
-        formats[j] = updatedFormat.build();
+        formats[j] = drmSessionManager.getCryptoFormat(originalFormat);
       }
 
       AdaptationSet firstAdaptationSet = adaptationSets.get(adaptationSetIndices[0]);

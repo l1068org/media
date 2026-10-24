@@ -81,7 +81,7 @@ public final class HlsSampleStreamWrapperTest {
             mock(Allocator.class),
             /* positionUs= */ 0L,
             /* muxedAudioFormat= */ null,
-            mock(DrmSessionManager.class),
+            DrmSessionManager.DRM_UNSUPPORTED,
             mock(DrmSessionEventListener.EventDispatcher.class),
             mock(LoadErrorHandlingPolicy.class),
             mock(MediaSourceEventListener.EventDispatcher.class),
